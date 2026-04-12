@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "punkrecords"
+version = "0.1.0"
+description = "A thinking second brain connecting LLM with personal Wiki"
+authors = []
+readme = "README.md"
+packages = [{include = "punkrecords"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+click = "^8.0"
+networkx = "^3.0"
+pyyaml = "^6.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.0"
+pytest-cov = "^4.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.build.solver"
