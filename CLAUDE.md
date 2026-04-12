@@ -9,6 +9,8 @@ PunkRecords (班克记录) is a "thinking second brain" project that connects LL
 ## Project Structure
 
 - `README.md` - Project introduction (Chinese)
+- `docs/ui_design.md` - **UI/product design spec (source of truth)**; all UI-related decisions must be recorded and updated there
+- `frontend/` - **Vite + React + TypeScript** web UI (`npm run dev` in `frontend/`)
 - `arch/` - Architecture documentation and diagrams
   - `punkrecords-architecture.png` - System architecture diagram
 
@@ -19,6 +21,10 @@ This project is in early development. No source code, build system, or developme
 ## Common Commands
 
 No build, lint, or test commands configured yet. These will be added once the project structure is established.
+
+## UI design
+
+When changing or implementing user-facing behavior, layouts, or copy: read and update `docs/ui_design.md` in the same change. Do not leave UI decisions only in issues or chat.
 
 ## Architecture
 

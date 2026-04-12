@@ -1,0 +1,409 @@
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import {
+  DOMAINS,
+  DEFAULT_DOMAIN_ID,
+  loadSavedDomainId,
+  saveDomainId,
+} from "./domains";
+import { SIDEBAR_NAV, type SidebarNavId } from "./sidebarNav";
+import { getTimeGreeting } from "./timeGreeting";
+
+type Role = "user" | "assistant";
+
+type ChatMessage = {
+  id: string;
+  role: Role;
+  content: string;
+};
+
+function uid(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+const STORAGE_SIDEBAR_COLLAPSED = "punkrecords_sidebar_collapsed";
+
+function loadSidebarCollapsed(): boolean {
+  try {
+    return localStorage.getItem(STORAGE_SIDEBAR_COLLAPSED) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function saveSidebarCollapsed(collapsed: boolean): void {
+  try {
+    localStorage.setItem(STORAGE_SIDEBAR_COLLAPSED, collapsed ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+}
+
+function IconPaperclip() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M21.44 11.05 12.25 20.24a5.98 5.98 0 1 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2.67 2.67 0 0 1-3.77-3.77l8.49-8.48" />
+    </svg>
+  );
+}
+
+function IconSend() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.25"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M12 19V5M5 12l7-7 7 7" />
+    </svg>
+  );
+}
+
+function IconChevronLeft() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M15 18l-6-6 6-6" />
+    </svg>
+  );
+}
+
+function IconChevronRight() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M9 18l6-6-6-6" />
+    </svg>
+  );
+}
+
+function IconHome() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+      <path d="M9 22V12h6v10" />
+    </svg>
+  );
+}
+
+function IconAgent() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="4" y="4" width="16" height="16" rx="2" />
+      <path d="M9 9h.01M15 9h.01M9 15c1.5 1 4.5 1 6 0" />
+    </svg>
+  );
+}
+
+function IconSettings() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+    </svg>
+  );
+}
+
+const NAV_ICONS: Record<SidebarNavId, ReactNode> = {
+  home: <IconHome />,
+  agent: <IconAgent />,
+  settings: <IconSettings />,
+};
+
+export function App() {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [navActive, setNavActive] = useState<SidebarNavId>("home");
+  const [domainId, setDomainId] = useState<string>(DEFAULT_DOMAIN_ID);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [draft, setDraft] = useState("");
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const endRef = useRef<HTMLDivElement>(null);
+  const composerRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setDomainId(loadSavedDomainId());
+    setSidebarCollapsed(loadSidebarCollapsed());
+  }, []);
+
+  useEffect(() => {
+    saveDomainId(domainId);
+  }, [domainId]);
+
+  useEffect(() => {
+    saveSidebarCollapsed(sidebarCollapsed);
+  }, [sidebarCollapsed]);
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const currentDomain = useMemo(
+    () => DOMAINS.find((d) => d.id === domainId) ?? DOMAINS[0],
+    [domainId],
+  );
+
+  const toggleSidebar = useCallback(() => {
+    setSidebarCollapsed((c) => !c);
+  }, []);
+
+  const addFiles = useCallback((files: FileList | File[]) => {
+    const list = Array.from(files).filter(Boolean);
+    if (!list.length) return;
+    setPendingFiles((prev) => [...prev, ...list]);
+  }, []);
+
+  const send = useCallback(() => {
+    const text = draft.trim();
+    const hasFiles = pendingFiles.length > 0;
+    if (!text && !hasFiles) return;
+
+    let userContent = text;
+    if (hasFiles) {
+      const names = pendingFiles.map((f) => f.name).join("、");
+      const fileNote = `〔随消息附带文件：${names}〕`;
+      userContent = text ? `${text}\n\n${fileNote}` : fileNote;
+    }
+
+    const userMsg: ChatMessage = {
+      id: uid(),
+      role: "user",
+      content: userContent,
+    };
+
+    setMessages((m) => [...m, userMsg]);
+    setDraft("");
+    setPendingFiles([]);
+
+    setTimeout(() => {
+      setMessages((m) => [
+        ...m,
+        {
+          id: uid(),
+          role: "assistant",
+          content:
+            `（演示回复）已收到你在「${currentDomain.name}」下的消息。后端接入后将解析正文、链接与附件并返回结果。`,
+        },
+      ]);
+    }, 400);
+  }, [draft, pendingFiles, currentDomain.name]);
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      send();
+    }
+  };
+
+  const onPaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.files;
+    if (items?.length) {
+      e.preventDefault();
+      addFiles(items);
+    }
+  };
+
+  const onDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  };
+
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (e.dataTransfer.files?.length) addFiles(e.dataTransfer.files);
+  };
+
+  const hasMessages = messages.length > 0;
+  const timeGreeting = useMemo(() => getTimeGreeting(), []);
+
+  return (
+    <div className="app">
+      <div className="layout">
+        <aside
+          id="app-sidebar"
+          className={`sidebar${sidebarCollapsed ? " sidebar--collapsed" : ""}`}
+          aria-label="主导航"
+        >
+          <nav className="sidebar-nav" aria-label="功能">
+            {SIDEBAR_NAV.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={`sidebar-nav-item${navActive === item.id ? " sidebar-nav-item--active" : ""}`}
+                title={item.label}
+                onClick={() => setNavActive(item.id)}
+              >
+                <span className="sidebar-nav-icon">{NAV_ICONS[item.id]}</span>
+                <span className="sidebar-nav-label">{item.label}</span>
+              </button>
+            ))}
+          </nav>
+
+          <div className="sidebar-brand">
+            <img
+              className="brand-logo"
+              src="/punkrecords_logo.png"
+              alt="PunkRecords 班克记录"
+            />
+            <div className="brand-text">
+              <h1 className="product-name">PunkRecords · 班克记录</h1>
+              <p className="product-tagline">
+                像贝加庞克一样，将你的大脑外化为无限的智慧仓库。
+              </p>
+            </div>
+          </div>
+        </aside>
+
+        <section className="main-panel" aria-label="对话">
+          <header className="main-topbar">
+            <button
+              type="button"
+              className="main-topbar-toggle"
+              onClick={toggleSidebar}
+              aria-expanded={!sidebarCollapsed}
+              aria-controls="app-sidebar"
+              aria-label={sidebarCollapsed ? "展开侧栏" : "收起侧栏"}
+            >
+              {sidebarCollapsed ? <IconChevronRight /> : <IconChevronLeft />}
+            </button>
+            <span className="main-topbar-title">班克记录</span>
+          </header>
+
+          <div
+            className={`main-inner${hasMessages ? "" : " main-inner--empty"}`}
+          >
+            <h2 className="hero-heading">
+              <span className="hero-greeting">{timeGreeting}</span>
+              ，今天想了解点什么？
+            </h2>
+
+            <div
+              className="domain-pills"
+              role="radiogroup"
+              aria-label="选择知识区域"
+            >
+              {DOMAINS.map((d) => (
+                <button
+                  key={d.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={d.id === domainId}
+                  className={`domain-pill${d.id === domainId ? " domain-pill--active" : ""}`}
+                  onClick={() => setDomainId(d.id)}
+                >
+                  <span className="domain-pill-emoji" aria-hidden>
+                    {d.emoji}
+                  </span>
+                  <span className="domain-pill-name">{d.name}</span>
+                </button>
+              ))}
+            </div>
+
+            <p className="context-hint">
+              当前区域：<strong>{currentDomain.name}</strong>
+              <span className="context-hint-dot">·</span>
+              {currentDomain.description}
+            </p>
+
+            <main className="chat">
+              <div className="messages">
+                {messages.length === 0 && (
+                  <div className="empty">
+                    <p>
+                      在下方输入框打字、粘贴链接，或将文件拖入输入区；也可点击回形针添加文件。
+                    </p>
+                  </div>
+                )}
+                {messages.map((msg) => (
+                  <article
+                    key={msg.id}
+                    className={`bubble bubble--${msg.role}`}
+                  >
+                    <div className="bubble-meta">
+                      {msg.role === "user" ? "你" : "助手"}
+                    </div>
+                    <div className="bubble-body">{msg.content}</div>
+                  </article>
+                ))}
+                <div ref={endRef} />
+              </div>
+            </main>
+
+            <footer
+              className="composer-wrap"
+              ref={composerRef}
+              onDragOver={onDragOver}
+              onDrop={onDrop}
+            >
+              {pendingFiles.length > 0 && (
+                <p className="composer-hint" aria-live="polite">
+                  将随下一条消息发送：{pendingFiles.map((f) => f.name).join("、")}
+                </p>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="visually-hidden"
+                accept=".md,.markdown,.pdf,application/pdf,text/markdown"
+                multiple
+                onChange={(e) => {
+                  addFiles(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+              <div className="composer-shell">
+                <button
+                  type="button"
+                  className="btn-attach"
+                  aria-label="添加文件"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <IconPaperclip />
+                </button>
+                <textarea
+                  className="input-text"
+                  rows={1}
+                  placeholder="输入问题、粘贴链接或拖入文件…（Enter 发送，Shift+Enter 换行）"
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={onKeyDown}
+                  onPaste={onPaste}
+                />
+                <button
+                  type="button"
+                  className="btn-send"
+                  aria-label="发送"
+                  onClick={send}
+                >
+                  <IconSend />
+                </button>
+              </div>
+            </footer>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}

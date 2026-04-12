@@ -3,3 +3,9 @@
 .superbrains
 __pycache__/
 *.pyc
+
+/docs/superpowers/
+
+# Frontend (Vite / Node)
+frontend/node_modules/
+frontend/dist/

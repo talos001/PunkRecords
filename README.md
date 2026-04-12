@@ -20,6 +20,10 @@
 - 📁 **分层知识组织** - 原材料与索引分离，支持多领域知识独立管理
 - 🔍 **智能知识处理** - AI 代理自动完成知识摄取、查询和整理
 
+## 文档
+
+- **[UI 设计规范](docs/ui_design.md)**：客户端界面、交互与文案原则；**后续所有 UI 相关设计均须在该文件中维护与更新**（单一事实来源）。
+
 ## 架构概览
 
 PunkRecords 采用清晰的三层架构设计：
@@ -47,7 +51,15 @@ PunkRecords 相信：
 
 ## 开始使用
 
-> 项目开发中，敬请期待...
+### Web 界面（开发中）
+
+```bash
+cd frontend && npm install && npm run dev
+```
+
+详见 [`frontend/README.md`](frontend/README.md)。产品/交互规范见 [`docs/ui_design.md`](docs/ui_design.md)。
+
+> CLI 与其它能力仍在迭代中。
 
 ## 路线图
 
