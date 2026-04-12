@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
 
 
 @dataclass
@@ -8,7 +8,7 @@ class Entity:
 
     id: str
     label: str
-    properties: Dict = field(default_factory=dict)
+    properties: Dict[str, Any] = field(default_factory=dict)
     source_path: Optional[str] = None  # Path in materials vault
 
     def to_dict(self) -> Dict:
@@ -28,7 +28,7 @@ class Relation:
     source_id: str
     target_id: str
     relation_type: str
-    properties: Dict = field(default_factory=dict)
+    properties: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict:
         """Convert to dictionary for serialization."""

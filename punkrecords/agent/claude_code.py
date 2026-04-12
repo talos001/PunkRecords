@@ -32,6 +32,7 @@ class ClaudeCodeAgent(BaseAgent):
             entities=entities,
             relations=relations,
             success=True,
+            error_message=None,
         )
 
     def query(self, question: str) -> QueryResult:
@@ -41,6 +42,7 @@ class ClaudeCodeAgent(BaseAgent):
             answer="",
             relevant_entities=[],
             success=True,
+            error_message=None,
         )
 
     def lint(self) -> LintResult:
@@ -51,3 +53,7 @@ class ClaudeCodeAgent(BaseAgent):
             success=True,
             message="Linting complete - no changes made",
         )
+
+
+from .registry import get_agent_registry
+get_agent_registry().register(ClaudeCodeAgent)
