@@ -55,6 +55,13 @@ PunkRecords 相信：
 
 ### HTTP API（FastAPI）
 
+可选环境变量（`POST /chat` 与材料落盘）：
+
+- `PUNKRECORDS_CONFIG`：YAML 路径，见仓库内 [`config.example.yaml`](config.example.yaml)。
+- `PUNKRECORDS_MATERIALS_VAULT`：未指定配置文件时，材料 Vault 根目录（默认 `./var/materials_vault`，启动时会创建）。
+- `PUNKRECORDS_LLM_PROVIDER`：`fake`（默认，占位回复）或 `anthropic`。
+- `ANTHROPIC_API_KEY`：选用 `anthropic` 时在环境中提供（勿提交仓库）。
+
 ```bash
 poetry install
 poetry run punkrecords serve --host 127.0.0.1 --port 8765
@@ -81,7 +88,7 @@ VITE_API_BASE_URL=http://127.0.0.1:8765
 ## 路线图
 
 - [x] HTTP API 骨架（health / domains / chat / agents / settings）
-- [ ] 基础代理框架与真实对话管线
+- [x] Chat：`LLMProvider` 适配器 + 材料落盘（`fake` / Anthropic，见 `docs/backend-chat-llm-adapter-design.md`）
 - [ ] graphify 知识图谱构建集成
 - [ ] Obsidian 插件开发
 - [ ] 多 Vault 知识索引管理

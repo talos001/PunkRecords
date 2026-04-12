@@ -5,16 +5,22 @@ from fastapi.testclient import TestClient
 
 from src.api.app import app
 
-client = TestClient(app)
+
+@pytest.fixture
+def client(monkeypatch, tmp_path):
+    monkeypatch.setenv("PUNKRECORDS_MATERIALS_VAULT", str(tmp_path))
+    monkeypatch.setenv("PUNKRECORDS_LLM_PROVIDER", "fake")
+    with TestClient(app) as c:
+        yield c
 
 
-def test_health() -> None:
+def test_health(client) -> None:
     r = client.get("/api/v1/health")
     assert r.status_code == 200
     assert r.json() == {"ok": True}
 
 
-def test_version() -> None:
+def test_version(client) -> None:
     r = client.get("/api/v1/version")
     assert r.status_code == 200
     data = r.json()
@@ -22,7 +28,7 @@ def test_version() -> None:
     assert "version" in data
 
 
-def test_domains() -> None:
+def test_domains(client) -> None:
     r = client.get("/api/v1/domains")
     assert r.status_code == 200
     data = r.json()
@@ -31,7 +37,7 @@ def test_domains() -> None:
     assert "chinese" in ids and "history" in ids
 
 
-def test_chat_text_only() -> None:
+def test_chat_text_only(client) -> None:
     r = client.post(
         "/api/v1/chat",
         data={"domain_id": "early-childhood", "text": "你好"},
@@ -39,10 +45,11 @@ def test_chat_text_only() -> None:
     assert r.status_code == 200
     body = r.json()
     assert body["message"]["role"] == "assistant"
-    assert "幼儿发展" in body["message"]["content"]
+    assert "[fake-llm]" in body["message"]["content"]
+    assert "你好" in body["message"]["content"]
 
 
-def test_chat_bad_domain() -> None:
+def test_chat_bad_domain(client) -> None:
     r = client.post(
         "/api/v1/chat",
         data={"domain_id": "nope", "text": "x"},
@@ -51,24 +58,26 @@ def test_chat_bad_domain() -> None:
     assert "error" in r.json()
 
 
-def test_chat_with_file() -> None:
+def test_chat_with_file(client) -> None:
     r = client.post(
         "/api/v1/chat",
         data={"domain_id": "math", "text": ""},
         files={"files": ("note.md", io.BytesIO(b"# hi"), "text/markdown")},
     )
     assert r.status_code == 200
-    assert "note.md" in r.json()["message"]["content"]
+    content = r.json()["message"]["content"]
+    assert "[fake-llm]" in content
+    assert "incoming" in content
 
 
-def test_agents() -> None:
+def test_agents(client) -> None:
     r = client.get("/api/v1/agents")
     assert r.status_code == 200
     data = r.json()
     assert any(a["id"] == "claude_code" for a in data["agents"])
 
 
-def test_settings_agent_put() -> None:
+def test_settings_agent_put(client) -> None:
     r = client.put("/api/v1/settings/agent", json={"agent_id": "codex"})
     assert r.status_code == 200
     assert r.json()["agent_id"] == "codex"

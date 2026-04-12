@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
@@ -7,9 +8,21 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from src.config import load_app_config
+from src.llm.registry import LLMRegistry
+
 from .v1.router import router as v1_router
 
 API_PREFIX = "/api/v1"
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    cfg = load_app_config()
+    cfg.materials_vault_path.mkdir(parents=True, exist_ok=True)
+    app.state.config = cfg
+    app.state.llm_registry = LLMRegistry(cfg)
+    yield
 
 
 def create_app() -> FastAPI:
@@ -17,6 +30,7 @@ def create_app() -> FastAPI:
         title="PunkRecords API",
         description="班克记录 HTTP API",
         version="0.1.0",
+        lifespan=lifespan,
     )
 
     app.add_middleware(

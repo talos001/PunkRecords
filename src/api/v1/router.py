@@ -1,19 +1,18 @@
 from __future__ import annotations
 
-import uuid
-from datetime import datetime, timezone
 from typing import List, Optional
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 
 from src import __version__ as PKG_VERSION
 
 from ..agents_registry import AGENTS, DEFAULT_AGENT_ID, get_agent_meta
+from ..chat_materials import ChatAttachmentError
+from ..chat_service import run_chat
 from ..domains_data import DEFAULT_DOMAIN_ID, domain_ids, domains_response, get_domain
 from ..schemas import (
     AgentOut,
     AgentsResponse,
-    ChatMessageOut,
     ChatResponse,
     DomainsResponse,
     SettingsAgentBody,
@@ -44,6 +43,7 @@ def get_domains() -> DomainsResponse:
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat(
+    request: Request,
     domain_id: str = Form(..., description="知识区域 id"),
     text: Optional[str] = Form(None),
     agent_id: Optional[str] = Form(None),
@@ -69,35 +69,29 @@ async def chat(
     for uf in upload_list:
         if uf.filename:
             file_names.append(uf.filename)
-        await uf.close()
 
     if not text and not file_names:
         raise HTTPException(status_code=400, detail="text 与 files 不能同时为空")
 
-    # TODO: 接入 Vault、ingest、真实 Agent 调用
-    parts = [
-        f"已收到你在「{domain_name}」下的请求（领域 id：`{domain_id}`）。",
-        f"当前 Agent：`{effective_agent}`。",
-    ]
-    if text:
-        parts.append(f"正文长度：{len(text)} 字符。")
-    if file_names:
-        parts.append("附件：" + "、".join(file_names) + "。")
-    parts.append("真实回答将在接入 LLM 与知识库管线后返回。")
-    content = "\n".join(parts)
-
-    now = datetime.now(timezone.utc)
-    created = now.isoformat().replace("+00:00", "Z")
-
-    return ChatResponse(
-        message=ChatMessageOut(
-            id=str(uuid.uuid4()),
-            role="assistant",
-            content=content,
-            created_at=created,
-        ),
-        job_ids=[],
-    )
+    cfg = request.app.state.config
+    registry = request.app.state.llm_registry
+    try:
+        return await run_chat(
+            domain_id=domain_id,
+            domain_name=domain_name,
+            agent_id=effective_agent,
+            text=text,
+            files=upload_list,
+            materials_root=cfg.materials_vault_path,
+            registry=registry,
+            config=cfg,
+        )
+    except ChatAttachmentError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
 
 
 @router.get("/agents", response_model=AgentsResponse)
