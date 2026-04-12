@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import List
+from typing import AsyncIterator, List, Tuple
 
 from fastapi import UploadFile
 
@@ -12,7 +12,7 @@ from src.llm import LLMRegistry
 from src.llm.types import Message
 
 from .chat_materials import SavedMaterial, save_chat_uploads
-from .chat_profiles import get_chat_profile
+from .chat_profiles import ChatProfile, get_chat_profile
 from .schemas import ChatMessageOut, ChatResponse
 
 
@@ -35,7 +35,7 @@ def _build_user_content(
     return "\n".join(lines)
 
 
-async def run_chat(
+async def prepare_chat_messages(
     *,
     domain_id: str,
     domain_name: str,
@@ -43,9 +43,7 @@ async def run_chat(
     text: str,
     files: List[UploadFile],
     materials_root: Path,
-    registry: LLMRegistry,
-    config: Config,
-) -> ChatResponse:
+) -> Tuple[List[Message], ChatProfile, List[SavedMaterial]]:
     profile = get_chat_profile(agent_id)
     saved: List[SavedMaterial] = []
     if files:
@@ -65,6 +63,28 @@ async def run_chat(
         Message(role="system", content=profile.system_prompt),
         Message(role="user", content=user_content),
     ]
+    return messages, profile, saved
+
+
+async def run_chat(
+    *,
+    domain_id: str,
+    domain_name: str,
+    agent_id: str,
+    text: str,
+    files: List[UploadFile],
+    materials_root: Path,
+    registry: LLMRegistry,
+    config: Config,
+) -> ChatResponse:
+    messages, profile, _saved = await prepare_chat_messages(
+        domain_id=domain_id,
+        domain_name=domain_name,
+        agent_id=agent_id,
+        text=text,
+        files=files,
+        materials_root=materials_root,
+    )
     model = profile.model_override or config.llm_model
     provider = registry.get_provider(profile.provider_id)
     result = await provider.complete(
@@ -83,3 +103,33 @@ async def run_chat(
         ),
         job_ids=[],
     )
+
+
+async def run_chat_stream(
+    *,
+    domain_id: str,
+    domain_name: str,
+    agent_id: str,
+    text: str,
+    files: List[UploadFile],
+    materials_root: Path,
+    registry: LLMRegistry,
+    config: Config,
+) -> AsyncIterator[str]:
+    messages, profile, _saved = await prepare_chat_messages(
+        domain_id=domain_id,
+        domain_name=domain_name,
+        agent_id=agent_id,
+        text=text,
+        files=files,
+        materials_root=materials_root,
+    )
+    model = profile.model_override or config.llm_model
+    provider = registry.get_provider(profile.provider_id)
+    async for chunk in provider.stream_complete(
+        messages=messages,
+        model=model,
+        temperature=profile.temperature,
+    ):
+        if chunk:
+            yield chunk

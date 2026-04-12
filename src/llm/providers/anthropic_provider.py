@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from typing import Optional
 
-from anthropic import APIStatusError, AsyncAnthropic
+from anthropic import APIConnectionError, APIStatusError, AsyncAnthropic
 
 from ..types import CompletionResult, Message
 
@@ -46,8 +47,42 @@ class AnthropicLLMProvider:
             resp = await self._client.messages.create(**kwargs)
         except APIStatusError as e:
             raise RuntimeError("LLM 服务暂时不可用，请稍后重试") from e
+        except APIConnectionError as e:
+            raise RuntimeError(
+                "无法连接 Anthropic API，请检查网络与代理；若配置了 llm_base_url（第三方网关），请确认地址可达"
+            ) from e
         text = _extract_text(resp)
         return CompletionResult(text=text, finish_reason=getattr(resp, "stop_reason", None))
+
+    async def stream_complete(
+        self,
+        *,
+        messages: list[Message],
+        model: str | None,
+        temperature: float | None,
+    ) -> AsyncIterator[str]:
+        system, anthropic_messages = _to_anthropic_messages(messages)
+        use_model = model or self._default_model
+        kwargs: dict = {
+            "model": use_model,
+            "max_tokens": 4096,
+            "messages": anthropic_messages,
+        }
+        if system:
+            kwargs["system"] = system
+        if temperature is not None:
+            kwargs["temperature"] = temperature
+        try:
+            async with self._client.messages.stream(**kwargs) as stream:
+                async for text in stream.text_stream:
+                    if text:
+                        yield text
+        except APIStatusError as e:
+            raise RuntimeError("LLM 服务暂时不可用，请稍后重试") from e
+        except APIConnectionError as e:
+            raise RuntimeError(
+                "无法连接 Anthropic API，请检查网络与代理；若配置了 llm_base_url（第三方网关），请确认地址可达"
+            ) from e
 
 
 def _extract_text(resp: object) -> str:

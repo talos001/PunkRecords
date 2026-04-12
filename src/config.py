@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Optional
 
 import yaml
+
+_log = logging.getLogger(__name__)
 
 
 def _optional_nonempty_str(value: object | None) -> Optional[str]:
@@ -28,10 +31,21 @@ class Config:
     llm_timeout_seconds: float = 120.0
 
 
+def _llm_provider_from_yaml(data: dict) -> str:
+    """支持 ``llm_provider`` 或简写 ``provider``；缺省为 fake（与 Config 默认值一致）。"""
+    raw = data.get("llm_provider") or data.get("provider")
+    if raw is None or str(raw).strip() == "":
+        return "fake"
+    return str(raw).strip().lower()
+
+
 def load_config(config_path: Path) -> Config:
     """Load configuration from YAML file."""
     with open(config_path, "r", encoding="utf-8") as f:
         data = yaml.safe_load(f)
+
+    if not isinstance(data, dict):
+        data = {}
 
     llm_key = data.get("llm_api_key") or data.get("agent_api_key")
     return Config(
@@ -42,7 +56,7 @@ def load_config(config_path: Path) -> Config:
         },
         default_agent_backend=data.get("default_agent_backend", "claude_code"),
         agent_api_key=_optional_nonempty_str(data.get("agent_api_key")),
-        llm_provider=str(data.get("llm_provider", "anthropic")),
+        llm_provider=_llm_provider_from_yaml(data),
         llm_base_url=_optional_nonempty_str(data.get("llm_base_url")),
         llm_api_key=_optional_nonempty_str(llm_key),
         llm_model=str(data.get("llm_model", "claude-sonnet-4-20250514")),
@@ -82,10 +96,30 @@ def default_config() -> Config:
 
 
 def load_app_config() -> Config:
-    """供 HTTP 服务使用：优先 ``PUNKRECORDS_CONFIG`` 指向的 YAML，否则 ``default_config``。"""
+    """供 HTTP 服务使用：优先 ``PUNKRECORDS_CONFIG`` 指向的 YAML，否则尝试当前工作目录下的 ``config.yaml``，最后 ``default_config``。"""
     path_raw = os.environ.get("PUNKRECORDS_CONFIG")
     if path_raw:
         p = Path(path_raw).expanduser()
         if p.is_file():
-            return load_config(p)
-    return default_config()
+            cfg = load_config(p)
+            _log.info(
+                "已加载配置 llm_provider=%s（来源 PUNKRECORDS_CONFIG=%s）",
+                cfg.llm_provider,
+                p,
+            )
+            return cfg
+    cwd_cfg = Path.cwd() / "config.yaml"
+    if cwd_cfg.is_file():
+        cfg = load_config(cwd_cfg)
+        _log.info(
+            "已加载配置 llm_provider=%s（来源 当前目录 config.yaml=%s）",
+            cfg.llm_provider,
+            cwd_cfg.resolve(),
+        )
+        return cfg
+    cfg = default_config()
+    _log.info(
+        "已加载配置 llm_provider=%s（来源 环境变量 default_config，未使用 YAML 文件）",
+        cfg.llm_provider,
+    )
+    return cfg

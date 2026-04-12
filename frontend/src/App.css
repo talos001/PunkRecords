@@ -18,6 +18,8 @@
   --radius-shell: 16px;
   --shadow-shell: 0 1px 3px rgba(0, 0, 0, 0.06);
   --sidebar-expanded: 260px;
+  /* 对话进行中展开侧栏：在 min~max 之间随视口宽度变化 */
+  --sidebar-chat-expanded: clamp(200px, 24vw, 260px);
   --sidebar-collapsed: 56px;
 }
 
@@ -27,28 +29,48 @@
   box-sizing: border-box;
 }
 
+/* 锁死视口高度，禁止整页跟聊天记录一起滚动；仅内部 .messages 滚动 */
+html {
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+
 html,
 body,
 #root {
-  height: 100%;
   margin: 0;
 }
 
 body {
+  height: 100%;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+  overscroll-behavior: none;
   font-family: var(--font-ui);
   color: var(--text);
   line-height: 1.5;
   background: var(--bg-page);
 }
 
+#root {
+  height: 100%;
+  max-height: 100dvh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
 .app {
-  min-height: 100%;
-  min-height: 100dvh;
+  flex: 1;
+  min-height: 0;
   width: 100%;
   margin: 0 auto;
   padding: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .layout {
@@ -57,7 +79,7 @@ body {
   align-items: stretch;
   flex: 1;
   min-height: 0;
-  min-height: 100dvh;
+  overflow: hidden;
 }
 
 /* ========== 左侧：可折叠导航 + 品牌 ========== */
@@ -67,7 +89,10 @@ body {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  min-height: 100dvh;
+  height: 100%;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
   padding: 0.65rem 0.85rem 1rem;
   background: var(--sidebar);
   border-right: 1px solid var(--border);
@@ -79,6 +104,11 @@ body {
 .sidebar--collapsed {
   width: var(--sidebar-collapsed);
   padding: 0.65rem 0.35rem 0.75rem;
+}
+
+/* 已开始对话：展开态侧栏随界面变窄/变宽（收起态仍为 56px） */
+.layout--chat-active .sidebar:not(.sidebar--collapsed) {
+  width: var(--sidebar-chat-expanded);
 }
 
 .sidebar-nav {
@@ -206,10 +236,12 @@ body {
 .main-panel {
   flex: 1;
   min-width: 0;
+  min-height: 0;
+  height: 100%;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   background: var(--bg);
-  min-height: 0;
 }
 
 .main-topbar {
@@ -262,9 +294,12 @@ body {
   margin: 0 auto;
 }
 
-/* 无消息时：把标题、领域、提示与输入区作为一整块垂直居中 */
+/* 无消息时：把标题、领域、提示与输入区作为一整块垂直居中；内容过高时仅主区内滚动 */
 .main-inner--empty {
   justify-content: center;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .main-inner--empty .chat {
@@ -280,6 +315,52 @@ body {
 
 .main-inner--empty .empty {
   padding: 0 0.5rem 1.25rem;
+}
+
+/* 有对话后：主区占满主面板高度，仅消息列表滚动，输入框固定在底部 */
+.main-inner--active-chat {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  justify-content: flex-start;
+  padding-top: 0.5rem;
+}
+
+.main-inner--active-chat .hero-heading,
+.main-inner--active-chat .context-hint {
+  display: none;
+}
+
+.main-inner--active-chat .domain-pills {
+  flex-shrink: 0;
+  margin-bottom: 0.5rem;
+}
+
+.main-inner--active-chat .chat {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.main-inner--active-chat .messages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding-bottom: 0.25rem;
+}
+
+.main-inner--active-chat .composer-wrap {
+  flex-shrink: 0;
+  padding-top: 0.75rem;
+  margin-top: 0;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.04);
 }
 
 .hero-heading {
@@ -432,6 +513,19 @@ body {
   font-size: 0.875rem;
 }
 
+.bubble-wait {
+  display: inline-block;
+  color: var(--text-muted);
+  font-style: italic;
+  animation: pulse-wait 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse-wait {
+  50% {
+    opacity: 0.55;
+  }
+}
+
 /* 一体化输入条 */
 .composer-wrap {
   flex-shrink: 0;
@@ -554,8 +648,11 @@ body {
 /* 窄屏：收起 = 左侧固定图标窄条；展开 = 全宽抽屉 + 遮罩，主区不被侧栏挤没 */
 .layout--narrow {
   display: block;
-  min-height: 100dvh;
-  min-height: 100svh;
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
 .layout--narrow .sidebar {
@@ -595,10 +692,19 @@ body {
   box-shadow: 4px 0 24px rgba(0, 0, 0, 0.12);
 }
 
+/* 已开始对话：窄屏抽屉略收窄，多留主区宽度 */
+.layout--narrow.layout--chat-active:not(.layout--narrow-rail) .sidebar {
+  width: min(252px, 88vw);
+}
+
 .layout--narrow .main-panel {
   width: 100%;
-  min-height: 100dvh;
-  min-height: 100svh;
+  height: 100%;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
 }
 
 /* 收起时为左侧窄条留出空间，避免主区被挡 */
@@ -651,5 +757,9 @@ body {
 
   .messages {
     min-height: 180px;
+  }
+
+  .main-inner--active-chat .messages {
+    min-height: 0;
   }
 }

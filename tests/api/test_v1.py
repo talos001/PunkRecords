@@ -8,6 +8,8 @@ from src.api.app import app
 
 @pytest.fixture
 def client(monkeypatch, tmp_path):
+    # 避免 pytest 在仓库根目录运行时误读项目内 config.yaml，导致 llm_provider 非 fake
+    monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("PUNKRECORDS_MATERIALS_VAULT", str(tmp_path))
     monkeypatch.setenv("PUNKRECORDS_LLM_PROVIDER", "fake")
     with TestClient(app) as c:
@@ -45,7 +47,7 @@ def test_chat_text_only(client) -> None:
     assert r.status_code == 200
     body = r.json()
     assert body["message"]["role"] == "assistant"
-    assert "[fake-llm]" in body["message"]["content"]
+    assert "毕达哥拉斯" in body["message"]["content"]
     assert "你好" in body["message"]["content"]
 
 
@@ -58,6 +60,22 @@ def test_chat_bad_domain(client) -> None:
     assert "error" in r.json()
 
 
+def test_chat_stream_sse(client) -> None:
+    with client.stream(
+        "POST",
+        "/api/v1/chat/stream",
+        data={"domain_id": "early-childhood", "text": "hi"},
+    ) as r:
+        assert r.status_code == 200
+        assert "text/event-stream" in r.headers.get("content-type", "")
+        raw_bytes = b"".join(r.iter_bytes())
+    raw = raw_bytes.decode("utf-8")
+    assert "data:" in raw
+    assert "start" in raw and "delta" in raw and "done" in raw
+    # 流式按短块切分，中文可能跨多个 delta，故只断言角色名首字出现在 SSE 正文中
+    assert "毕" in raw
+
+
 def test_chat_with_file(client) -> None:
     r = client.post(
         "/api/v1/chat",
@@ -66,7 +84,7 @@ def test_chat_with_file(client) -> None:
     )
     assert r.status_code == 200
     content = r.json()["message"]["content"]
-    assert "[fake-llm]" in content
+    assert "毕达哥拉斯" in content
     assert "incoming" in content
 
 

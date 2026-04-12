@@ -5,8 +5,7 @@
 <p align="center">
   <em>像贝加庞克一样</em>，将你的大脑外化为无限的智慧仓库。<br />
   <br />
-  连接 LLM 与个人 Wiki，让零散的笔记与灵感在此汇聚、碰撞、重生。<br />
-  这是属于你的「班克记录」，一个会思考的第二大脑。
+  <strong>贝加庞克（Vegapunk）</strong>的智慧分身<strong>毕达哥拉斯（Pythagoras）</strong>担当你的知识存储与数据分析的助手，让零散的笔记与灵感在此汇聚、碰撞、重生，这是属于你的「班克记录」。
 </p>
 
 ---
@@ -58,8 +57,9 @@ PunkRecords 相信：
 可选环境变量（`POST /chat` 与材料落盘）：
 
 - `PUNKRECORDS_CONFIG`：YAML 路径，见仓库内 [`config.example.yaml`](config.example.yaml)（推荐在 YAML 中配置 **BASE URL / API Key / model** 三项：`llm_base_url`、`llm_api_key`、`llm_model`）。
+- **未设置 `PUNKRECORDS_CONFIG` 时**：若你在**启动命令的当前工作目录**下放了 `config.yaml`（例如在仓库根目录执行 `poetry run punkrecords serve`），会自动加载该文件；否则走下方环境变量默认。
 - `PUNKRECORDS_MATERIALS_VAULT`：未指定配置文件时，材料 Vault 根目录（默认 `./var/materials_vault`，启动时会创建）。
-- `PUNKRECORDS_LLM_PROVIDER`：`fake`（默认，占位回复）或 `anthropic`。
+- `PUNKRECORDS_LLM_PROVIDER`：仅在**未通过上述 YAML 加载到配置**时生效；`fake`（默认，占位回复）或 `anthropic`。若你以为改了 `config.yaml` 却仍走真实 API，多半是未加载到该文件（请确认 `PUNKRECORDS_CONFIG` 或从含 `config.yaml` 的目录启动），或 shell 里仍导出着本变量。
 - **LLM 三项（与 YAML 等价，便于本机调试）**：`PUNKRECORDS_LLM_BASE_URL`（或 `ANTHROPIC_BASE_URL`）、`PUNKRECORDS_LLM_API_KEY`（或 `ANTHROPIC_API_KEY`）、`PUNKRECORDS_LLM_MODEL`。
 
 ```bash

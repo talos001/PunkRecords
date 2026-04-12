@@ -6,8 +6,12 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { postChat } from "./api/chat";
+import { postChatStream } from "./api/chat";
 import { apiDomainsToLocal, fetchDomains } from "./api/domains";
+import {
+  PYTHAGORAS_BUBBLE_LABEL,
+  PYTHAGORAS_THINKING,
+} from "./brand";
 import { API_BASE_URL, useLiveApi } from "./config";
 import {
   DOMAINS,
@@ -25,6 +29,8 @@ type ChatMessage = {
   id: string;
   role: Role;
   content: string;
+  /** 流式生成中（首字到达前显示等待提示） */
+  streaming?: boolean;
 };
 
 function uid(): string {
@@ -195,13 +201,31 @@ export function App() {
   const [draft, setDraft] = useState("");
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [sending, setSending] = useState(false);
-  const endRef = useRef<HTMLDivElement>(null);
+  const messagesRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  /** 流式请求中止（切换领域时打断） */
+  const streamAbortRef = useRef<AbortController | null>(null);
+  /** 离线演示回复的定时器（切换领域时清除） */
+  const demoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setDomainId(loadSavedDomainId());
   }, []);
+
+  /** 切换知识区域：清空对话，回到空状态，并中止进行中的发送 */
+  useEffect(() => {
+    streamAbortRef.current?.abort();
+    streamAbortRef.current = null;
+    if (demoTimeoutRef.current !== null) {
+      clearTimeout(demoTimeoutRef.current);
+      demoTimeoutRef.current = null;
+    }
+    setMessages([]);
+    setDraft("");
+    setPendingFiles([]);
+    setSending(false);
+  }, [domainId]);
 
   useEffect(() => {
     if (!useLiveApi) return;
@@ -241,7 +265,11 @@ export function App() {
   }, [narrowScreen, sidebarCollapsed]);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = messagesRef.current;
+    if (!el) return;
+    requestAnimationFrame(() => {
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    });
   }, [messages]);
 
   const currentDomain = useMemo(
@@ -287,45 +315,102 @@ export function App() {
 
     if (useLiveApi) {
       setSending(true);
+      let assistantMsgId = uid();
+      setMessages((m) => [
+        ...m,
+        {
+          id: assistantMsgId,
+          role: "assistant",
+          content: "",
+          streaming: true,
+        },
+      ]);
+      const ac = new AbortController();
+      streamAbortRef.current?.abort();
+      streamAbortRef.current = ac;
       try {
-        const res = await postChat({
+        await postChatStream({
           baseUrl: API_BASE_URL,
           domainId: domainSnapshot,
           text,
           files: filesSnapshot,
+          signal: ac.signal,
+          onEvent: (ev) => {
+            // 不要用服务端 start.id 替换本条消息的 id：setState 异步，紧随其后的 delta
+            // 会用新 id 去匹配，而树里可能仍是旧 id，导致永远不拼接正文、一直停在思考提示。
+            if (ev.type === "start") {
+              return;
+            }
+            if (ev.type === "delta") {
+              setMessages((m) =>
+                m.map((msg) =>
+                  msg.id === assistantMsgId
+                    ? {
+                        ...msg,
+                        content: msg.content + ev.text,
+                        streaming: true,
+                      }
+                    : msg,
+                ),
+              );
+              return;
+            }
+            if (ev.type === "done") {
+              setMessages((m) =>
+                m.map((msg) =>
+                  msg.id === assistantMsgId
+                    ? { ...msg, streaming: false }
+                    : msg,
+                ),
+              );
+              return;
+            }
+            if (ev.type === "error") {
+              setMessages((m) =>
+                m.map((msg) =>
+                  msg.id === assistantMsgId
+                    ? {
+                        ...msg,
+                        content: `发送失败：${ev.message}`,
+                        streaming: false,
+                      }
+                    : msg,
+                ),
+              );
+            }
+          },
         });
-        setMessages((m) => [
-          ...m,
-          {
-            id: res.message.id,
-            role: "assistant",
-            content: res.message.content,
-          },
-        ]);
       } catch (e) {
+        if (
+          (e instanceof DOMException && e.name === "AbortError") ||
+          (e instanceof Error && e.name === "AbortError")
+        ) {
+          return;
+        }
         const msg = e instanceof Error ? e.message : "发送失败";
-        setMessages((m) => [
-          ...m,
-          {
-            id: uid(),
-            role: "assistant",
-            content: `发送失败：${msg}`,
-          },
-        ]);
+        setMessages((m) =>
+          m.map((x) =>
+            x.id === assistantMsgId
+              ? { ...x, content: `发送失败：${msg}`, streaming: false }
+              : x,
+          ),
+        );
       } finally {
         setSending(false);
+        if (streamAbortRef.current === ac) streamAbortRef.current = null;
       }
       return;
     }
 
-    setTimeout(() => {
+    demoTimeoutRef.current = setTimeout(() => {
+      demoTimeoutRef.current = null;
       setMessages((m) => [
         ...m,
         {
           id: uid(),
           role: "assistant",
           content:
-            `（演示回复）已收到你在「${nameSnapshot}」下的消息。后端接入后将解析正文、链接与附件并返回结果。`,
+            `我是毕达哥拉斯（Pythagoras），贝加庞克的智慧分身。已收到你在「${nameSnapshot}」下的消息。（当前为前端离线演示；接入后端后将由我做知识整理与回答。）`,
         },
       ]);
     }, 400);
@@ -362,7 +447,7 @@ export function App() {
   return (
     <div className="app">
       <div
-        className={`layout${narrowScreen ? " layout--narrow" : ""}${narrowScreen && sidebarCollapsed ? " layout--narrow-rail" : ""}`}
+        className={`layout${narrowScreen ? " layout--narrow" : ""}${narrowScreen && sidebarCollapsed ? " layout--narrow-rail" : ""}${hasMessages ? " layout--chat-active" : ""}`}
       >
         {narrowScreen && !sidebarCollapsed && (
           <button
@@ -427,7 +512,7 @@ export function App() {
           </header>
 
           <div
-            className={`main-inner${hasMessages ? "" : " main-inner--empty"}`}
+            className={`main-inner${hasMessages ? " main-inner--active-chat" : " main-inner--empty"}`}
           >
             <h2 className="hero-heading">
               <span className="hero-greeting">{timeGreeting}</span>
@@ -463,7 +548,7 @@ export function App() {
             </p>
 
             <main className="chat">
-              <div className="messages">
+              <div className="messages" ref={messagesRef}>
                 {messages.length === 0 && (
                   <div className="empty">
                     <p>
@@ -477,12 +562,20 @@ export function App() {
                     className={`bubble bubble--${msg.role}`}
                   >
                     <div className="bubble-meta">
-                      {msg.role === "user" ? "你" : "助手"}
+                      {msg.role === "user" ? "你" : PYTHAGORAS_BUBBLE_LABEL}
                     </div>
-                    <div className="bubble-body">{msg.content}</div>
+                    <div className="bubble-body">
+                      {msg.content}
+                      {msg.role === "assistant" &&
+                        msg.streaming &&
+                        !msg.content && (
+                          <span className="bubble-wait" aria-live="polite">
+                            {PYTHAGORAS_THINKING}
+                          </span>
+                        )}
+                    </div>
                   </article>
                 ))}
-                <div ref={endRef} />
               </div>
             </main>
 

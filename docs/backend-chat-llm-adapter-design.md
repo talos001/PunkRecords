@@ -6,7 +6,7 @@
 
 | 阶段 | 内容 | 与 `api-outline` 对齐 |
 |------|------|----------------------|
-| **P0（本设计，方案 A）** | `POST /chat`：multipart 解析 → 材料**可靠落盘**到 Material Vault → **单次** LLM 调用返回助手消息；`job_ids` 恒为空数组；正文中的 URL **不抓取**（可原样进入 prompt 或仅作占位说明） | P0 |
+| **P0（本设计，方案 A）** | `POST /chat`：multipart 解析 → 材料**可靠落盘**到 Material Vault → **单次** LLM 调用返回 `role: assistant` 的模型消息；`job_ids` 恒为空数组；正文中的 URL **不抓取**（可原样进入 prompt 或仅作占位说明） | P0 |
 | **后续 Plan B** | 正文/附件中 URL 的抓取、与 ingest 管线对齐（`BaseAgent.ingest`、索引 Vault） | `api-outline` 3.1 说明、`P1` |
 | **后续 Plan C** | ingest/建图等慢步骤异步化，返回真实 `job_ids`，实现 `GET /api/v1/jobs/{job_id}` | `api-outline` 5、`P2` |
 

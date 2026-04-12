@@ -88,7 +88,7 @@
   "message": {
     "id": "msg_uuid",
     "role": "assistant",
-    "content": "助手回复的纯文本或 Markdown",
+    "content": "模型侧回复正文（纯文本或 Markdown；对话角色为毕达哥拉斯）",
     "created_at": "2026-04-12T10:00:00+08:00"
   },
   "job_ids": []
@@ -97,13 +97,22 @@
 
 - `job_ids`（可选）：若 ingest / 建索引异步，可返回任务 id，供「任务状态」接口轮询（见下）。
 
-### 3.2 流式输出（推荐第二阶段）
+### 3.2 流式输出（SSE）
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| `POST` | `/api/v1/chat/stream` | 同 `multipart` 入参，响应为 **SSE** 或 **WebSocket**，分块返回助手正文 |
+| `POST` | `/api/v1/chat/stream` | 与 3.1 相同 `multipart/form-data` 入参；响应 **`Content-Type: text/event-stream`**，UTF-8，**SSE** 行：`data: <JSON>\n\n` |
 
-前端需单独接 `EventSource` 或 WS；首版可只做 3.1。
+**事件类型（`data` 内 JSON 的 `type` 字段）**
+
+| `type` | 含义 |
+|--------|------|
+| `start` | 首包；含 `id`（本条模型消息 id）、`created_at`（ISO8601 Z） |
+| `delta` | 正文增量；含 `text`（字符串片段，前端拼接） |
+| `done` | 结束；含与 `start` 一致的 `id`、`job_ids`（可为 `[]`） |
+| `error` | 失败；含 `message`（人类可读） |
+
+前端应用 `fetch` 读 body 流并按 `\n\n` 解析 `data:` 行；首字未到时可展示「等待/生成中」提示。
 
 ---
 

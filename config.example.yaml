@@ -13,5 +13,6 @@ llm_model: "claude-sonnet-4-20250514"
 # 兼容旧字段：仅当未设置 llm_api_key 时作为 Key 来源
 # agent_api_key: "sk-ant-..."
 
+# llm_provider 与简写 provider 等价；缺省为 fake。未设置 PUNKRECORDS_CONFIG 时，若在启动目录存在 config.yaml 也会自动加载。
 llm_provider: "anthropic"
 llm_timeout_seconds: 120

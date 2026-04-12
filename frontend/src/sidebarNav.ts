@@ -7,6 +7,6 @@ export const SIDEBAR_NAV: {
   label: string;
 }[] = [
   { id: "home", label: "主页" },
-  { id: "agent", label: "选择 Agent" },
+  { id: "agent", label: "对话风格" },
   { id: "settings", label: "设置" },
 ];
