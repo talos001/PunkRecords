@@ -6,4 +6,4 @@ if TYPE_CHECKING:
     from .material_vault import MaterialVault
     from .index_vault import IndexVault
 
-__all__ = ["BaseVault"]
+__all__ = ["BaseVault", "MaterialVault"]
