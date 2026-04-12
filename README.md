@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/punkrecords_logo.png" width="240" alt="PunkRecords Logo" />
+  <img src="docs/logo/punkrecords_logo.png" width="240" alt="PunkRecords Logo" />
 </p>
 <h3 align="center">PunkRecords · 班克记录</h3>
 <p align="center">
@@ -23,9 +23,10 @@
 
 - **[UI 设计规范](docs/ui_design.md)**：客户端界面、交互与文案原则；**后续所有 UI 相关设计均须在该文件中维护与更新**（单一事实来源）。
 - **[API 接口需求](docs/api-outline.md)**：前后端联调所需的 REST/文件上传/可选流式与 Agent、设置等接口轮廓。
-- **[Chat + LLM 实现计划](docs/backend-chat-llm-implementation-plan.md)**：`POST /chat` 落盘、LLM 适配器与 ChatProfile（P0）的分步落地顺序与测试清单。
+- **[Chat + LLM 实现计划](docs/superpowers/plans/backend-chat-llm-implementation-plan.md)**：`POST /chat` 落盘、LLM 适配器与 ChatProfile（P0）的分步落地顺序与测试清单。
 - **[Plan B：Vault 管线递进](docs/plan-b-vault-pipeline.md)**：材料层统一 → 索引与 ingest → URL/异步/图谱（1→2→3），避免先堆 API 再反推磁盘布局。
-- **[待实现清单](docs/backlog.md)**：URL 抓取、异步 job、图谱深链、会话等尚未实现项，便于排期。
+- **[待实现清单](docs/backlog.md)**：**已计划实施**、可进入排期与开发的条目（URL 抓取、异步 job、图谱深链、会话等）。
+- **[功能规划（讨论稿）](docs/function_plan.md)**：**讨论中、待定** 的议题与方案，**不作为实施依据**；定稿后迁入 `backlog.md` 再开发。
 - **[联调手册](docs/integration-handbook.md)**：前后端本地启动、配置、`curl` 自检与常见问题。
 
 ## 架构概览
@@ -103,7 +104,7 @@ VITE_API_BASE_URL=http://127.0.0.1:8765
 ## 路线图
 
 - [x] HTTP API 骨架（health / domains / chat / agents / settings）
-- [x] Chat：`LLMProvider` 适配器 + 材料落盘（`fake` / Anthropic，见 `docs/backend-chat-llm-adapter-design.md`）
+- [x] Chat：`LLMProvider` 适配器 + 材料落盘（`fake` / Anthropic，见 `docs/superpowers/specs/backend-chat-llm-adapter-design.md`）
 - [ ] graphify 知识图谱构建集成
 - [ ] Obsidian 插件开发
 - [ ] 多 Vault 知识索引管理

@@ -11,10 +11,13 @@ PunkRecords (班克记录) is a "thinking second brain" project that connects LL
 - `README.md` - Project introduction (Chinese)
 - `docs/ui_design.md` - **UI/product design spec (source of truth)**; all UI-related decisions must be recorded and updated there
 - `docs/api-outline.md` - **Backend API requirements** for frontend integration (update when contracts change)
+- `docs/backlog.md` - **Planned-for-implementation** backlog (eligible for scheduling)
+- `docs/function_plan.md` - **Discussion / tentative ideas only**; **not** a commitment to build; move items to `backlog.md` once approved for implementation
 - `frontend/` - **Vite + React + TypeScript** web UI (`npm run dev` in `frontend/`)
 - `src/api/` - **FastAPI** HTTP service (`poetry run punkrecords serve` or `punkrecords-serve`)
-- `arch/` - Architecture documentation and diagrams
-  - `punkrecords-architecture.png` - System architecture diagram
+- `docs/arch/` - Architecture documentation and diagrams
+  - `docs/arch/punkrecords_arch.png` - System architecture diagram
+  - `docs/arch/PunkRecords_Arch.md` - Architecture notes (Markdown)
 
 ## Current State
 
@@ -32,6 +35,6 @@ When changing or implementing user-facing behavior, layouts, or copy: read and u
 
 ## Architecture
 
-The high-level architecture is documented in `arch/punkrecords-architecture.png`. Always refer to this diagram when understanding the intended system design.
+The high-level architecture is documented in `docs/arch/punkrecords_arch.png` (and `docs/arch/PunkRecords_Arch.md`). Refer to these when understanding the intended system design.
 
 The vision: Connect LLM with personal Wiki to create a knowledge warehouse that externalizes and augments human thinking, serving as a second brain that can "think" by processing and connecting ideas.

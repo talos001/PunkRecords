@@ -2,7 +2,7 @@
 
 本文约定 **Plan B**（URL、ingest、索引 Vault 等）在工程上的落地顺序，避免**先堆 HTTP API 再反推磁盘布局**。
 
-依据：`docs/backend-chat-llm-adapter-design.md`（P0 已完成）、`docs/api-outline.md`。
+依据：`docs/superpowers/specs/backend-chat-llm-adapter-design.md`（P0 已完成）、`docs/api-outline.md`。
 
 ---
 
@@ -82,3 +82,4 @@
 | 2026-04-12 | 阶段 2 落地：`domain_index_paths`、摄取管线、`punkrecords ingest`、graph/wiki 索引合并 |
 | 2026-04-12 | 阶段 3 部分：`POST /ingest`、`chat_auto_ingest` |
 | 2026-04-12 | 待办项迁至 `backlog.md` |
+| 2026-04-12 | 依据文档路径改为 `docs/superpowers/specs/backend-chat-llm-adapter-design.md` |

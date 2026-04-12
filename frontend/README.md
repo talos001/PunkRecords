@@ -28,5 +28,5 @@ npm run build
 
 - 当前对话回复为 **前端占位**，后端 API 接入后替换 `App.tsx` 中的发送逻辑。
 - 领域列表见 `src/domains.ts`；**默认领域为「幼儿发展」**；记住上次选择（`localStorage`），旧版「通用」会迁移为默认领域。
-- Logo 置于 `public/punkrecords_logo.png`，与仓库 `docs/punkrecords_logo.png` 保持一致。
+- Logo 置于 `public/punkrecords_logo.png`，与仓库 `docs/logo/punkrecords_logo.png` 保持一致。
 - 左侧栏可折叠（顶栏按钮切换），并含「主页 / 选择 Agent / 设置」占位导航；折叠状态会记住。

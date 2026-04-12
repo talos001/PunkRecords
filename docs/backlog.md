@@ -1,6 +1,13 @@
 # 待实现清单（Backlog）
 
-与 `[api-outline.md](api-outline.md)`、`[plan-b-vault-pipeline.md](plan-b-vault-pipeline.md)` 对齐；**当前已实现**的聊天、Vault 摄取、`POST /ingest`、流式 SSE 等不在此重复。
+## 本文档定位（项目约束）
+
+| 属性 | 说明 |
+|------|------|
+| **性质** | 收录 **已经计划实施** 的能力条目，可与版本/迭代排期挂钩，作为开发落地的依据之一。 |
+| **与 [`function_plan.md`](function_plan.md) 的区别** | `function_plan.md` 为 **讨论中、待定** 的方案与议题，**不考虑实施**、不构成排期承诺；**仅当**某条从讨论定稿并决定开发后，才应 **迁入本 backlog**（或直接在 issue/里程碑中跟踪并在此留档）。 |
+
+与 [`api-outline.md`](api-outline.md)、[`plan-b-vault-pipeline.md`](plan-b-vault-pipeline.md) 对齐；**当前已实现**的聊天、Vault 摄取、`POST /ingest`、流式 SSE 等不在此重复。
 
 ---
 
@@ -30,8 +37,9 @@
 ## 修订记录
 
 
-| 日期         | 摘要                 |
-| ---------- | ------------------ |
+| 日期 | 摘要 |
+|------|------|
 | 2026-04-12 | 初稿：记录尚未实现能力，便于后续排期 |
+| 2026-04-12 | 明确：本文件为已计划实施项；与 `function_plan.md`（讨论稿、非实施依据）分工 |
 
 

@@ -113,10 +113,12 @@ curl -N -X POST http://127.0.0.1:8765/api/v1/chat/stream \
 ## 7. 相关文档
 
 - 接口字段：[`api-outline.md`](api-outline.md)
-- 待实现能力（勿与本次联调混淆）：[`backlog.md`](backlog.md)
+- **已计划实施** 的能力（勿与本次联调混淆）：[`backlog.md`](backlog.md)
+- **讨论中、非实施依据** 的议题：[`function_plan.md`](function_plan.md)（与 `backlog.md` 分工见该文件 §1）
 
 ## 修订记录
 
 | 日期 | 摘要 |
 |------|------|
 | 2026-04-12 | 初稿：联调步骤与 curl 自检 |
+| 2026-04-12 | 相关文档：区分 `backlog.md`（已计划实施）与 `function_plan.md`（讨论稿） |

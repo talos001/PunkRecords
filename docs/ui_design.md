@@ -14,7 +14,7 @@
 
 ---
 
-## 1. 与架构的关系（`arch/PunkRecords_Arch.md`）
+## 1. 与架构的关系（[PunkRecords_Arch.md](arch/PunkRecords_Arch.md)）
 
 UI 层在架构中承担：
 
@@ -169,7 +169,7 @@ UI 只提交 `domain_id`（或同等标识），由服务端解析 Vault。
 - 领域列表与默认领域：`frontend/src/domains.ts`（与后端 `domain_id` 对齐时需同步配置或改为接口拉取）。
 - 侧栏导航项（占位）：`frontend/src/sidebarNav.ts`。
 - 侧栏折叠状态：`localStorage` 键 `punkrecords_sidebar_collapsed`（`1` / `0`）。
-- Logo：源文件可参考 `docs/punkrecords_logo.png`；构建时使用 `frontend/public/punkrecords_logo.png`（由 Vite 以根路径 `/punkrecords_logo.png` 提供）。
+- Logo：源文件见 `docs/logo/punkrecords_logo.png`；构建时使用 `frontend/public/punkrecords_logo.png`（由 Vite 以根路径 `/punkrecords_logo.png` 提供）。
 
 ### 9.3 后续对接
 
@@ -194,3 +194,4 @@ UI 只提交 `domain_id`（或同等标识），由服务端解析 Vault。
 | 2026-04-12 | 对话角色定为毕达哥拉斯（Pythagoras），禁用用户向「助手」文案；侧栏「对话风格」 |
 | 2026-04-12 | 切换知识区域时清空对话并回到空状态，中止流式请求 |
 | 2026-04-12 | 侧栏副文案改为 `PRODUCT_TAGLINE`（与 README 同步） |
+| 2026-04-12 | 文档路径：架构说明 `docs/arch/`；Logo 源文件 `docs/logo/punkrecords_logo.png` |
