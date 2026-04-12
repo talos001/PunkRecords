@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Iterator, Dict, List
+from typing import Iterator, Dict
 from .base import BaseVault
 
 
