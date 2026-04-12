@@ -6,11 +6,15 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { postChat } from "./api/chat";
+import { apiDomainsToLocal, fetchDomains } from "./api/domains";
+import { API_BASE_URL, useLiveApi } from "./config";
 import {
   DOMAINS,
   DEFAULT_DOMAIN_ID,
   loadSavedDomainId,
   saveDomainId,
+  type Domain,
 } from "./domains";
 import { SIDEBAR_NAV, type SidebarNavId } from "./sidebarNav";
 import { getTimeGreeting } from "./timeGreeting";
@@ -135,10 +139,12 @@ const NAV_ICONS: Record<SidebarNavId, ReactNode> = {
 export function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [navActive, setNavActive] = useState<SidebarNavId>("home");
+  const [domainsList, setDomainsList] = useState<Domain[]>(DOMAINS);
   const [domainId, setDomainId] = useState<string>(DEFAULT_DOMAIN_ID);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [sending, setSending] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -146,6 +152,26 @@ export function App() {
   useEffect(() => {
     setDomainId(loadSavedDomainId());
     setSidebarCollapsed(loadSidebarCollapsed());
+  }, []);
+
+  useEffect(() => {
+    if (!useLiveApi) return;
+    let cancelled = false;
+    fetchDomains(API_BASE_URL)
+      .then((res) => {
+        if (cancelled) return;
+        const { domains, defaultDomainId } = apiDomainsToLocal(res);
+        setDomainsList(domains);
+        setDomainId((prev) =>
+          domains.some((d) => d.id === prev) ? prev : defaultDomainId,
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setDomainsList(DOMAINS);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -161,8 +187,8 @@ export function App() {
   }, [messages]);
 
   const currentDomain = useMemo(
-    () => DOMAINS.find((d) => d.id === domainId) ?? DOMAINS[0],
-    [domainId],
+    () => domainsList.find((d) => d.id === domainId) ?? domainsList[0],
+    [domainId, domainsList],
   );
 
   const toggleSidebar = useCallback(() => {
@@ -175,7 +201,7 @@ export function App() {
     setPendingFiles((prev) => [...prev, ...list]);
   }, []);
 
-  const send = useCallback(() => {
+  const send = useCallback(async () => {
     const text = draft.trim();
     const hasFiles = pendingFiles.length > 0;
     if (!text && !hasFiles) return;
@@ -193,9 +219,46 @@ export function App() {
       content: userContent,
     };
 
+    const filesSnapshot = [...pendingFiles];
+    const domainSnapshot = domainId;
+    const nameSnapshot = currentDomain.name;
+
     setMessages((m) => [...m, userMsg]);
     setDraft("");
     setPendingFiles([]);
+
+    if (useLiveApi) {
+      setSending(true);
+      try {
+        const res = await postChat({
+          baseUrl: API_BASE_URL,
+          domainId: domainSnapshot,
+          text,
+          files: filesSnapshot,
+        });
+        setMessages((m) => [
+          ...m,
+          {
+            id: res.message.id,
+            role: "assistant",
+            content: res.message.content,
+          },
+        ]);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "发送失败";
+        setMessages((m) => [
+          ...m,
+          {
+            id: uid(),
+            role: "assistant",
+            content: `发送失败：${msg}`,
+          },
+        ]);
+      } finally {
+        setSending(false);
+      }
+      return;
+    }
 
     setTimeout(() => {
       setMessages((m) => [
@@ -204,16 +267,16 @@ export function App() {
           id: uid(),
           role: "assistant",
           content:
-            `（演示回复）已收到你在「${currentDomain.name}」下的消息。后端接入后将解析正文、链接与附件并返回结果。`,
+            `（演示回复）已收到你在「${nameSnapshot}」下的消息。后端接入后将解析正文、链接与附件并返回结果。`,
         },
       ]);
     }, 400);
-  }, [draft, pendingFiles, currentDomain.name]);
+  }, [draft, pendingFiles, domainId, currentDomain.name]);
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      send();
+      if (!sending) void send();
     }
   };
 
@@ -304,7 +367,7 @@ export function App() {
               role="radiogroup"
               aria-label="选择知识区域"
             >
-              {DOMAINS.map((d) => (
+              {domainsList.map((d) => (
                 <button
                   key={d.id}
                   type="button"
@@ -369,7 +432,8 @@ export function App() {
                 accept=".md,.markdown,.pdf,application/pdf,text/markdown"
                 multiple
                 onChange={(e) => {
-                  addFiles(e.target.files);
+                  const fl = e.target.files;
+                  if (fl) addFiles(fl);
                   e.target.value = "";
                 }}
               />
@@ -395,7 +459,8 @@ export function App() {
                   type="button"
                   className="btn-send"
                   aria-label="发送"
-                  onClick={send}
+                  disabled={sending}
+                  onClick={() => void send()}
                 >
                   <IconSend />
                 </button>

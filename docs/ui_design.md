@@ -168,6 +168,7 @@ UI 只提交 `domain_id`（或同等标识），由服务端解析 Vault。
 ### 9.3 后续对接
 
 - 聊天与上传应调用后端 API（如 FastAPI），请求中携带 **当前 `domain_id`**，由服务端解析 Vault；**不在前端暴露路径**。
+- 接口路径与字段的完整清单见 **[api-outline.md](api-outline.md)**（随前后端约定迭代更新）。
 
 ---
 

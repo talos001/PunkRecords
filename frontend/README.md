@@ -1,6 +1,8 @@
 # PunkRecords Web UI
 
-技术栈：**TypeScript · React 18 · Vite 5**。行为与文案遵循仓库根目录 [`docs/ui_design.md`](../docs/ui_design.md)。
+技术栈：**TypeScript · React 18 · Vite 5**。行为与文案遵循 [`docs/ui_design.md`](../docs/ui_design.md)。**后端接口需求**见 [`docs/api-outline.md`](../docs/api-outline.md)。
+
+**联调后端**：复制 `.env.example` 为 `.env.local`，设置 `VITE_API_BASE_URL=http://127.0.0.1:8765`（与 `punkrecords serve` 端口一致）。未设置时仍为前端本地演示回复。
 
 ## 开发
 

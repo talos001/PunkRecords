@@ -10,17 +10,21 @@ PunkRecords (班克记录) is a "thinking second brain" project that connects LL
 
 - `README.md` - Project introduction (Chinese)
 - `docs/ui_design.md` - **UI/product design spec (source of truth)**; all UI-related decisions must be recorded and updated there
+- `docs/api-outline.md` - **Backend API requirements** for frontend integration (update when contracts change)
 - `frontend/` - **Vite + React + TypeScript** web UI (`npm run dev` in `frontend/`)
+- `punkrecords/api/` - **FastAPI** HTTP service (`poetry run punkrecords serve` or `punkrecords-serve`)
 - `arch/` - Architecture documentation and diagrams
   - `punkrecords-architecture.png` - System architecture diagram
 
 ## Current State
 
-This project is in early development. No source code, build system, or development tooling has been added yet.
+Python package with CLI, graph/vault/agent modules, and a **FastAPI** HTTP API. Web UI lives under `frontend/`.
 
 ## Common Commands
 
-No build, lint, or test commands configured yet. These will be added once the project structure is established.
+- `poetry run pytest` — run tests
+- `poetry run punkrecords serve --port 8765` — start API server
+- `cd frontend && npm run dev` — Vite dev server (set `VITE_API_BASE_URL` to talk to the API)
 
 ## UI design
 

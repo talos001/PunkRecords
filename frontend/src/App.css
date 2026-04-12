@@ -531,6 +531,12 @@ body {
   transform: scale(0.96);
 }
 
+.btn-send:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;

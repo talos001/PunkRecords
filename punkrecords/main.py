@@ -47,6 +47,22 @@ def lint(ctx):
     click.echo("Linting knowledge base...")
 
 
+@cli.command("serve")
+@click.option("--host", default="127.0.0.1", help="监听地址")
+@click.option("--port", default=8765, type=int, help="监听端口")
+@click.option("--reload", is_flag=True, help="开发模式自动重载")
+def serve_cmd(host: str, port: int, reload: bool):
+    """启动 HTTP API（FastAPI + Uvicorn）。"""
+    import uvicorn
+
+    uvicorn.run(
+        "punkrecords.api.app:app",
+        host=host,
+        port=port,
+        reload=reload,
+    )
+
+
 def main():
     """Main entry point."""
     # Register all agents

@@ -23,6 +23,7 @@
 ## 文档
 
 - **[UI 设计规范](docs/ui_design.md)**：客户端界面、交互与文案原则；**后续所有 UI 相关设计均须在该文件中维护与更新**（单一事实来源）。
+- **[API 接口需求](docs/api-outline.md)**：前后端联调所需的 REST/文件上传/可选流式与 Agent、设置等接口轮廓。
 
 ## 架构概览
 
@@ -51,22 +52,38 @@ PunkRecords 相信：
 
 ## 开始使用
 
-### Web 界面（开发中）
+### HTTP API（FastAPI）
+
+```bash
+poetry install
+poetry run punkrecords serve --host 127.0.0.1 --port 8765
+# 或
+poetry run punkrecords-serve --port 8765
+```
+
+接口说明见 [`docs/api-outline.md`](docs/api-outline.md)。健康检查：`GET http://127.0.0.1:8765/api/v1/health`。
+
+### Web 前端
 
 ```bash
 cd frontend && npm install && npm run dev
 ```
 
-详见 [`frontend/README.md`](frontend/README.md)。产品/交互规范见 [`docs/ui_design.md`](docs/ui_design.md)。
+联调后端时，在 `frontend/.env.local` 中设置：
 
-> CLI 与其它能力仍在迭代中。
+```bash
+VITE_API_BASE_URL=http://127.0.0.1:8765
+```
+
+详见 [`frontend/README.md`](frontend/README.md)。产品/交互规范见 [`docs/ui_design.md`](docs/ui_design.md)。
 
 ## 路线图
 
-- [ ] 基础代理框架实现
+- [x] HTTP API 骨架（health / domains / chat / agents / settings）
+- [ ] 基础代理框架与真实对话管线
 - [ ] graphify 知识图谱构建集成
 - [ ] Obsidian 插件开发
 - [ ] 多 Vault 知识索引管理
-- [ ] 交互式聊天界面
-- [ ] 支持多种 AI 代理后端
+- [x] 交互式聊天界面（Web，可联调 API）
+- [ ] 支持多种 AI 代理后端（端到端）
 

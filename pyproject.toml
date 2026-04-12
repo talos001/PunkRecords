@@ -11,13 +11,18 @@ python = "^3.10"
 click = "^8.0"
 networkx = "^3.0"
 pyyaml = "^6.0"
+fastapi = "^0.115.0"
+uvicorn = {extras = ["standard"], version = "^0.32.0"}
+python-multipart = "^0.0.17"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.0"
 pytest-cov = "^4.0"
+httpx = "^0.28.0"
 
 [tool.poetry.scripts]
 punkrecords = "punkrecords.main:main"
+punkrecords-serve = "punkrecords.api.cli:main"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
