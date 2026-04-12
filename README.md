@@ -1,8 +1,15 @@
-# PunkRecords (班克记录)
+<p align="center">
+  <img src="docs/punkrecords_logo.png" width="240" alt="PunkRecords Logo" />
+</p>
+<h3 align="center">PunkRecords · 班克记录</h3>
+<p align="center">
+  <em>像贝加庞克一样</em>，将你的大脑外化为无限的智慧仓库。<br />
+  <br />
+  连接 LLM 与个人 Wiki，让零散的笔记与灵感在此汇聚、碰撞、重生。<br />
+  这是属于你的「班克记录」，一个会思考的第二大脑。
+</p>
 
-![PunkRecords](docs/Punk_Records_Picture.webp)
-
-像贝加庞克一样，将你的大脑外化为无限的智慧仓库。连接 LLM 与个人 Wiki，让零散的笔记与灵感在此汇聚、碰撞、重生——这是属于你的"班克记录"，一个会思考的第二大脑。
+---
 
 ## 特性
 
@@ -29,8 +36,6 @@ PunkRecords 采用清晰的三层架构设计：
 ### 第三层：Obsidian Vaults 层
 - **本地知识库原材料 Vault** - 存储原始知识材料，按领域分类目录组织
 - **领域知识索引 Vaults** - 每个领域独立一个 Vault，仅存储 Wiki 索引和图谱索引数据，索引中引用原材料 Vault 的原始数据
-
-![架构图](arch/punkrecords-architecture.png)
 
 ## 核心理念
 
