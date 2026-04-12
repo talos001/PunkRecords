@@ -1,3 +1,5 @@
 /.superpowers
 /PunkRecords/.superpowers
 .superbrains
+__pycache__/
+*.pyc
