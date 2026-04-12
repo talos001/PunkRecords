@@ -1,5 +1,8 @@
 import tempfile
 from pathlib import Path
+
+import pytest
+
 from src.vaults.material_vault import MaterialVault
 
 
@@ -52,3 +55,26 @@ def test_get_relative_path():
         relative_path = vault.get_relative_path(absolute_path)
 
         assert relative_path == Path("data") / "note.md"
+
+
+def test_safe_upload_filename():
+    assert MaterialVault.safe_upload_filename("a/../b.md") == "b.md"
+    assert MaterialVault.safe_upload_filename(None) == "unnamed"
+
+
+def test_validate_domain_segment_rejects_path():
+    with pytest.raises(ValueError):
+        MaterialVault.validate_domain_segment("a/b")
+
+
+def test_allocate_chat_incoming_batch_dir_shape():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp_path = Path(tmpdir)
+        vault = MaterialVault(tmp_path)
+        d = vault.allocate_chat_incoming_batch_dir("math")
+        assert d.is_absolute()
+        parts = d.relative_to(tmp_path).parts
+        assert parts[0] == "math"
+        assert parts[1] == "incoming"
+        assert len(parts[2]) == 10  # YYYY-MM-DD
+        assert len(parts[3]) == 12  # batch hex

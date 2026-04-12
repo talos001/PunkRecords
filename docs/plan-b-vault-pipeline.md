@@ -28,6 +28,8 @@
 
 **不做**：不要求此阶段就写 `IndexVault` 或开放新 REST 路由。
 
+**已实施（代码）**：`MaterialVault.allocate_chat_incoming_batch_dir`、`safe_upload_filename`、`validate_domain_segment`；`api/chat_materials.save_chat_uploads` 仅通过 `MaterialVault` 落盘并计算相对路径。
+
 ---
 
 ## 阶段 2：领域索引 Vault + 摄取写回（Index + Ingest）
@@ -70,3 +72,4 @@
 | 日期 | 摘要 |
 |------|------|
 | 2026-04-12 | 初稿：Plan B 按 1→2→3 递进，反模式说明 |
+| 2026-04-12 | 阶段 1 落地：`MaterialVault` 统一聊天上传路径与文件名；`chat_materials` 已接入 |
