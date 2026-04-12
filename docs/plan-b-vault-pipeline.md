@@ -61,6 +61,8 @@
 
 **已部分实施**：`POST /api/v1/ingest`（与 CLI 等价）；配置 `chat_auto_ingest` 与聊天落盘后自动摄取（需 `domain_index_paths`）。
 
+**尚未实现**（排期见 [`backlog.md`](backlog.md)）：正文 URL 抓取、`job_ids` 与 `GET /jobs/{id}`、`GET /graph/open`、会话 CRUD、`BaseAgent.ingest` 真实实体抽取等。
+
 ---
 
 ## 反模式（避免）
@@ -79,3 +81,4 @@
 | 2026-04-12 | 阶段 1 落地：`MaterialVault` 统一聊天上传路径与文件名；`chat_materials` 已接入 |
 | 2026-04-12 | 阶段 2 落地：`domain_index_paths`、摄取管线、`punkrecords ingest`、graph/wiki 索引合并 |
 | 2026-04-12 | 阶段 3 部分：`POST /ingest`、`chat_auto_ingest` |
+| 2026-04-12 | 待办项迁至 `backlog.md` |

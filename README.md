@@ -25,6 +25,8 @@
 - **[API 接口需求](docs/api-outline.md)**：前后端联调所需的 REST/文件上传/可选流式与 Agent、设置等接口轮廓。
 - **[Chat + LLM 实现计划](docs/backend-chat-llm-implementation-plan.md)**：`POST /chat` 落盘、LLM 适配器与 ChatProfile（P0）的分步落地顺序与测试清单。
 - **[Plan B：Vault 管线递进](docs/plan-b-vault-pipeline.md)**：材料层统一 → 索引与 ingest → URL/异步/图谱（1→2→3），避免先堆 API 再反推磁盘布局。
+- **[待实现清单](docs/backlog.md)**：URL 抓取、异步 job、图谱深链、会话等尚未实现项，便于排期。
+- **[联调手册](docs/integration-handbook.md)**：前后端本地启动、配置、`curl` 自检与常见问题。
 
 ## 架构概览
 
