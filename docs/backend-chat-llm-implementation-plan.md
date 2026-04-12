@@ -70,8 +70,8 @@
 
 ## 后续（本计划不执行）
 
-- **Plan B**：URL 抓取、`BaseAgent.ingest`、索引 Vault。
-- **Plan C**：`job_ids`、任务存储、`GET /jobs/{id}`。
+- **Plan B**：Vault 与摄取管线按 **[plan-b-vault-pipeline.md](./plan-b-vault-pipeline.md)** 递进：**1 材料层统一 → 2 领域索引与 ingest → 3 URL/异步/图谱**；避免先堆 API 再反推磁盘布局。
+- **Plan C**：`job_ids`、任务存储、`GET /jobs/{id}`（可与 Plan B 阶段 3 合并实现）。
 
 ## 修订记录
 
@@ -79,3 +79,4 @@
 |------|------|
 | 2026-04-12 | 初稿：依赖、配置、目录、顺序、测试、验收 |
 | 2026-04-12 | P0 已落地：`src/llm/*`、`chat_*`、`app` lifespan、`config.example.yaml`、测试 `tests/api/` |
+| 2026-04-12 | Plan B 递进顺序见 `plan-b-vault-pipeline.md` |
