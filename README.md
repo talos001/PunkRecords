@@ -72,6 +72,16 @@ poetry run punkrecords-serve --port 8765
 
 接口说明见 [`docs/api-outline.md`](docs/api-outline.md)。健康检查：`GET http://127.0.0.1:8765/api/v1/health`。
 
+### CLI：摄取（Plan B 阶段 2）
+
+在 [`config.example.yaml`](config.example.yaml) 中配置 **`domain_index_paths`**（领域 id → 该领域索引 Vault 目录）后，可将材料 Vault 内的单个文件写入对应索引（`graph_index.json` / `wiki_index.json`）：
+
+```bash
+poetry run punkrecords --config /path/to/config.yaml ingest -d math math/incoming/2026-04-12/abc/note.md
+```
+
+未传 `--config` 时，若当前工作目录存在 `config.yaml` 会自动加载。详见 [`docs/plan-b-vault-pipeline.md`](docs/plan-b-vault-pipeline.md)。
+
 ### Web 前端
 
 ```bash

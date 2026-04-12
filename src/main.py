@@ -1,12 +1,23 @@
 import click
 from pathlib import Path
-from .config import load_config
-from .vaults.material_vault import MaterialVault
-from .vaults.index_vault import IndexVault
+
 from .agent import AgentRegistry
 from .agent.claude_code import ClaudeCodeAgent
 from .agent.codex import CodexAgent
 from .agent.opencode import OpenCodeAgent
+from .config import load_config
+
+
+def _cli_config(ctx: click.Context):
+    """``--config``、当前目录 ``config.yaml`` 或报错。"""
+    if ctx.obj is not None:
+        return ctx.obj
+    cwd = Path.cwd() / "config.yaml"
+    if cwd.is_file():
+        return load_config(cwd)
+    raise click.UsageError(
+        "请使用 --config 指定配置文件，或在当前工作目录放置 config.yaml"
+    )
 
 
 @click.group()
@@ -19,15 +30,31 @@ def cli(ctx, config):
 
 
 @cli.command()
-@click.option("--domain", "-d", required=True, help="Domain to ingest into")
-@click.argument("path")
+@click.option("--domain", "-d", required=True, help="领域 id（须与 domain_index_paths 键一致）")
+@click.option(
+    "--agent",
+    "-a",
+    default=None,
+    help="覆盖 default_agent_backend（如 claude_code）",
+)
+@click.argument("path", type=str)
 @click.pass_context
-def ingest(ctx, domain, path):
-    """Ingest a note into the knowledge base."""
-    config = ctx.obj
-    material_path = config.materials_vault_path / path
-    # TODO: Full implementation
-    click.echo(f"Ingesting {material_path} into domain {domain}...")
+def ingest(ctx, domain, path, agent):
+    """将材料 Vault 内单个文件摄取到该领域的索引 Vault（graph + wiki 元数据）。"""
+    from .ingest.service import ingest_material_file
+
+    config = _cli_config(ctx)
+    try:
+        result = ingest_material_file(
+            config, domain, path, agent_backend=agent
+        )
+    except ValueError as e:
+        raise click.ClickException(str(e)) from e
+    if not result.success:
+        raise click.ClickException(result.error_message or "摄取失败")
+    click.echo(
+        f"已摄取到领域「{domain}」：实体 {len(result.entities)}，关系 {len(result.relations)}"
+    )
 
 
 @cli.command()

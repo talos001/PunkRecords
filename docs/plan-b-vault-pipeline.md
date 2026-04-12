@@ -45,6 +45,8 @@
 
 **不做**：不要求此阶段就实现 URL 抓取或 `job_ids` 全链路（可留给阶段 3）。
 
+**已实施（代码）**：`vaults/factory.py`（`resolve_index_vault_path`、`open_index_vault`）；`ingest/service.ingest_material_file`（材料路径校验 → `BaseAgent.ingest` → 合并 `graph_index` / `wiki_index`）；CLI `punkrecords ingest -d <domain> <相对路径>`；配置示例见 `config.example.yaml` 的 `domain_index_paths`。
+
 ---
 
 ## 阶段 3：产品化能力（URL、异步任务、图谱入口）
@@ -73,3 +75,4 @@
 |------|------|
 | 2026-04-12 | 初稿：Plan B 按 1→2→3 递进，反模式说明 |
 | 2026-04-12 | 阶段 1 落地：`MaterialVault` 统一聊天上传路径与文件名；`chat_materials` 已接入 |
+| 2026-04-12 | 阶段 2 落地：`domain_index_paths`、摄取管线、`punkrecords ingest`、graph/wiki 索引合并 |

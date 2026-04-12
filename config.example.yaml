@@ -1,7 +1,13 @@
 # 复制为本地路径并重命名；通过环境变量 PUNKRECORDS_CONFIG 指向该文件。
 
 materials_vault_path: "~/Obsidian/MaterialsVault"
-domain_index_paths: {}
+
+# 各领域索引 Vault 根目录（与前端 domain id 一致）；摄取 CLI 依赖此映射
+domain_index_paths:
+  early-childhood: "~/Obsidian/IndexEarlyChildhood"
+  math: "~/Obsidian/IndexMath"
+  # 其他领域按需添加
+
 default_agent_backend: "claude_code"
 
 # --- LLM 三项（anthropic 适配器）：BASE URL、API Key、模型 ---
