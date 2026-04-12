@@ -1,6 +1,6 @@
 import tempfile
 from pathlib import Path
-from punkrecords.vaults.material_vault import MaterialVault
+from src.vaults.material_vault import MaterialVault
 
 
 def test_iter_markdown_files():

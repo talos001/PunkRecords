@@ -26,7 +26,7 @@ def main() -> None:
     )
     args = parser.parse_args()
     uvicorn.run(
-        "punkrecords.api.app:app",
+        "src.api.app:app",
         host=args.host,
         port=args.port,
         reload=args.reload,

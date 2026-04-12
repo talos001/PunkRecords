@@ -12,7 +12,7 @@ PunkRecords (班克记录) is a "thinking second brain" project that connects LL
 - `docs/ui_design.md` - **UI/product design spec (source of truth)**; all UI-related decisions must be recorded and updated there
 - `docs/api-outline.md` - **Backend API requirements** for frontend integration (update when contracts change)
 - `frontend/` - **Vite + React + TypeScript** web UI (`npm run dev` in `frontend/`)
-- `punkrecords/api/` - **FastAPI** HTTP service (`poetry run punkrecords serve` or `punkrecords-serve`)
+- `src/api/` - **FastAPI** HTTP service (`poetry run punkrecords serve` or `punkrecords-serve`)
 - `arch/` - Architecture documentation and diagrams
   - `punkrecords-architecture.png` - System architecture diagram
 

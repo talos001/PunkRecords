@@ -178,4 +178,4 @@
 | 日期 | 摘要 |
 |------|------|
 | 2026-04-12 | 初稿：健康、领域、对话、可选会话/任务/Agent/设置/图谱 |
-| 2026-04-12 | 已实现 P0：`GET /health`、`GET /version`、`GET /domains`、`POST /chat`、`GET /agents`、`GET|PUT /settings/agent`、`GET /settings`（见 `punkrecords/api/`） |
+| 2026-04-12 | 已实现 P0：`GET /health`、`GET /version`、`GET /domains`、`POST /chat`、`GET /agents`、`GET|PUT /settings/agent`、`GET /settings`（见 `src/api/`） |

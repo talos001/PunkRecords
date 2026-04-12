@@ -1,6 +1,6 @@
 from pathlib import Path
 import pytest
-from punkrecords.vaults.base import BaseVault
+from src.vaults.base import BaseVault
 
 
 def test_base_vault_abstract():

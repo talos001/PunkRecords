@@ -152,7 +152,7 @@ UI 只提交 `domain_id`（或同等标识），由服务端解析 Vault。
 | 用户界面 | **TypeScript + React 18** | 类型安全、组件化，便于聊天、附件与后续 Markdown 预览 |
 | 构建 | **Vite 5** | 开发热更新快，生产构建简单 |
 | 样式 | **CSS**（变量 + 组件级 `App.css`） | 无额外 UI 框架依赖，便于落实本文档的视觉方向 |
-| 后端（现有） | **Python**（`punkrecords`） | 领域映射、Vault、Agent 等；与 UI 通过 **HTTP API** 对接（待接） |
+| 后端（现有） | **Python**（`src` 包） | 领域映射、Vault、Agent 等；与 UI 通过 **HTTP API** 对接（待接） |
 | 桌面壳（可选、未做） | **Tauri** | 可将同一 `frontend` 打包为桌面应用，需单独里程碑 |
 
 不推荐用 Python 桌面框架（如 PyQt）做主聊天界面：开发与社区生态对现代 Web 交互支持较弱；**Python 保留为服务端与 CLI** 更符合当前架构。

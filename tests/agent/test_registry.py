@@ -1,7 +1,7 @@
 from pathlib import Path
 import pytest
-from punkrecords.agent.registry import AgentRegistry, get_agent_registry
-from punkrecords.agent.base import BaseAgent, IngestionResult, QueryResult, LintResult
+from src.agent.registry import AgentRegistry, get_agent_registry
+from src.agent.base import BaseAgent, IngestionResult, QueryResult, LintResult
 
 
 class TestAgent(BaseAgent):

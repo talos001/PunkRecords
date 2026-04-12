@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "A thinking second brain connecting LLM with personal Wiki"
 authors = []
 readme = "README.md"
-packages = [{include = "punkrecords"}]
+packages = [{include = "src"}]
 
 [tool.poetry.dependencies]
 python = "^3.10"
@@ -21,8 +21,8 @@ pytest-cov = "^4.0"
 httpx = "^0.28.0"
 
 [tool.poetry.scripts]
-punkrecords = "punkrecords.main:main"
-punkrecords-serve = "punkrecords.api.cli:main"
+punkrecords = "src.main:main"
+punkrecords-serve = "src.api.cli:main"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

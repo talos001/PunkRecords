@@ -1,4 +1,4 @@
-from punkrecords.graph.entities import Entity, Relation
+from src.graph.entities import Entity, Relation
 
 
 def test_entity_creation():

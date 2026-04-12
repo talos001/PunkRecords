@@ -1,5 +1,5 @@
-from punkrecords.graph.builder import GraphBuilder
-from punkrecords.graph.entities import Entity, Relation
+from src.graph.builder import GraphBuilder
+from src.graph.entities import Entity, Relation
 
 
 def test_add_entity():

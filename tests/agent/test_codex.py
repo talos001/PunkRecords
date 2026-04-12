@@ -1,6 +1,6 @@
 from pathlib import Path
-from punkrecords.agent.codex import CodexAgent
-from punkrecords.agent.base import IngestionResult, QueryResult, LintResult
+from src.agent.codex import CodexAgent
+from src.agent.base import IngestionResult, QueryResult, LintResult
 
 
 def test_codex_agent_exists():

@@ -6,7 +6,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
-from punkrecords import __version__ as PKG_VERSION
+from src import __version__ as PKG_VERSION
 
 from ..agents_registry import AGENTS, DEFAULT_AGENT_ID, get_agent_meta
 from ..domains_data import DEFAULT_DOMAIN_ID, domain_ids, domains_response, get_domain

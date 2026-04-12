@@ -3,7 +3,7 @@ import io
 import pytest
 from fastapi.testclient import TestClient
 
-from punkrecords.api.app import app
+from src.api.app import app
 
 client = TestClient(app)
 

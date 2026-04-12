@@ -1,7 +1,7 @@
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from punkrecords.agent.claude_code import ClaudeCodeAgent
-from punkrecords.agent.base import IngestionResult, QueryResult, LintResult
+from src.agent.claude_code import ClaudeCodeAgent
+from src.agent.base import IngestionResult, QueryResult, LintResult
 
 
 def test_claude_code_agent_exists():

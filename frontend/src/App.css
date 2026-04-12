@@ -85,7 +85,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
-  margin-bottom: 0.75rem;
+  flex: 1;
+  min-height: 0;
 }
 
 .sidebar-nav-item {
@@ -149,9 +150,10 @@ body {
 }
 
 .sidebar-brand {
-  margin-top: auto;
-  padding-top: 1rem;
-  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+  padding-bottom: 1rem;
+  margin-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -549,11 +551,100 @@ body {
   border: 0;
 }
 
-@media (max-width: 800px) {
-  .sidebar:not(.sidebar--collapsed) {
-    width: min(var(--sidebar-expanded), 78vw);
-  }
+/* 窄屏：收起 = 左侧固定图标窄条；展开 = 全宽抽屉 + 遮罩，主区不被侧栏挤没 */
+.layout--narrow {
+  display: block;
+  min-height: 100dvh;
+  min-height: 100svh;
+}
 
+.layout--narrow .sidebar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 400;
+  min-height: 100dvh;
+  min-height: 100svh;
+  border-right: 1px solid var(--border);
+  transition:
+    width 0.22s ease,
+    box-shadow 0.22s ease,
+    padding 0.22s ease;
+}
+
+/* 收起：与桌面一致的 56px 图标栏，始终贴左可见 */
+.layout--narrow.layout--narrow-rail .sidebar {
+  width: var(--sidebar-collapsed);
+  transform: translateX(0);
+  padding-top: calc(0.65rem + env(safe-area-inset-top, 0px));
+  padding-left: calc(0.35rem + env(safe-area-inset-left, 0px));
+  padding-right: 0.35rem;
+  padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  box-shadow: none;
+}
+
+/* 展开：完整抽屉浮在内容之上 */
+.layout--narrow:not(.layout--narrow-rail) .sidebar {
+  width: min(280px, min(var(--sidebar-expanded), 88vw));
+  transform: translateX(0);
+  padding-top: calc(0.65rem + env(safe-area-inset-top, 0px));
+  padding-left: calc(0.85rem + env(safe-area-inset-left, 0px));
+  padding-right: 0.85rem;
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.12);
+}
+
+.layout--narrow .main-panel {
+  width: 100%;
+  min-height: 100dvh;
+  min-height: 100svh;
+}
+
+/* 收起时为左侧窄条留出空间，避免主区被挡 */
+.layout--narrow.layout--narrow-rail .main-panel {
+  padding-left: calc(
+    var(--sidebar-collapsed) + env(safe-area-inset-left, 0px)
+  );
+}
+
+.layout--narrow .main-topbar {
+  padding-top: calc(0.45rem + env(safe-area-inset-top, 0px));
+  padding-left: calc(0.75rem + env(safe-area-inset-left, 0px));
+  padding-right: calc(0.75rem + env(safe-area-inset-right, 0px));
+}
+
+.layout--narrow.layout--narrow-rail .main-topbar {
+  padding-left: 0.75rem;
+}
+
+.layout--narrow .main-inner {
+  padding-left: calc(1rem + env(safe-area-inset-left, 0px));
+  padding-right: calc(1rem + env(safe-area-inset-right, 0px));
+  padding-bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px));
+}
+
+.layout--narrow.layout--narrow-rail .main-inner {
+  padding-left: 1rem;
+}
+
+.layout--narrow .composer-wrap {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 350;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: rgba(0, 0, 0, 0.38);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (max-width: 800px) {
   .main-inner {
     padding: 1rem 1rem 1.25rem;
   }

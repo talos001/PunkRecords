@@ -1,12 +1,12 @@
 import tempfile
 from pathlib import Path
-from punkrecords.vaults.index_vault import IndexVault
+from src.vaults.index_vault import IndexVault
 
 
 def test_index_vault_creation():
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp_path = Path(tmpdir)
-        # Don't manually create .punkrecords - IndexVault should do it
+        # Don't manually create index state dir - IndexVault should do it
         vault = IndexVault(tmp_path, domain_name="test")
         assert vault.domain_name == "test"
         assert vault.graph_index_path.exists()

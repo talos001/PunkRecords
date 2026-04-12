@@ -33,11 +33,15 @@ function uid(): string {
 
 const STORAGE_SIDEBAR_COLLAPSED = "punkrecords_sidebar_collapsed";
 
+/** 无记录时默认收起，与桌面「折叠」语义一致 */
 function loadSidebarCollapsed(): boolean {
   try {
-    return localStorage.getItem(STORAGE_SIDEBAR_COLLAPSED) === "1";
+    const raw = localStorage.getItem(STORAGE_SIDEBAR_COLLAPSED);
+    if (raw === "0") return false;
+    if (raw === "1") return true;
+    return true;
   } catch {
-    return false;
+    return true;
   }
 }
 
@@ -47,6 +51,26 @@ function saveSidebarCollapsed(collapsed: boolean): void {
   } catch {
     /* ignore */
   }
+}
+
+const NARROW_BREAKPOINT_PX = 768;
+
+function useNarrowScreen(): boolean {
+  const [narrow, setNarrow] = useState(() =>
+    typeof window !== "undefined"
+      ? window.matchMedia(`(max-width: ${NARROW_BREAKPOINT_PX}px)`).matches
+      : false,
+  );
+
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${NARROW_BREAKPOINT_PX}px)`);
+    const onChange = () => setNarrow(mq.matches);
+    onChange();
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
+  return narrow;
 }
 
 function IconPaperclip() {
@@ -87,18 +111,41 @@ function IconSend() {
   );
 }
 
-function IconChevronLeft() {
+/** 侧栏收起时：汉堡菜单，表示可展开 */
+function IconSidebarExpand() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M15 18l-6-6 6-6" />
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M4 6h16M4 12h16M4 18h16" />
     </svg>
   );
 }
 
-function IconChevronRight() {
+/** 侧栏展开时：左窄右宽分栏，表示可收起为窄条 */
+function IconSidebarCollapseToggle() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M9 18l6-6-6-6" />
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <rect x="3" y="4" width="5" height="16" rx="1.5" />
+      <rect x="11" y="4" width="10" height="16" rx="1.5" />
     </svg>
   );
 }
@@ -137,7 +184,10 @@ const NAV_ICONS: Record<SidebarNavId, ReactNode> = {
 };
 
 export function App() {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const narrowScreen = useNarrowScreen();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() =>
+    loadSidebarCollapsed(),
+  );
   const [navActive, setNavActive] = useState<SidebarNavId>("home");
   const [domainsList, setDomainsList] = useState<Domain[]>(DOMAINS);
   const [domainId, setDomainId] = useState<string>(DEFAULT_DOMAIN_ID);
@@ -151,7 +201,6 @@ export function App() {
 
   useEffect(() => {
     setDomainId(loadSavedDomainId());
-    setSidebarCollapsed(loadSidebarCollapsed());
   }, []);
 
   useEffect(() => {
@@ -181,6 +230,15 @@ export function App() {
   useEffect(() => {
     saveSidebarCollapsed(sidebarCollapsed);
   }, [sidebarCollapsed]);
+
+  useEffect(() => {
+    if (!narrowScreen || sidebarCollapsed) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSidebarCollapsed(true);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [narrowScreen, sidebarCollapsed]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -303,12 +361,36 @@ export function App() {
 
   return (
     <div className="app">
-      <div className="layout">
+      <div
+        className={`layout${narrowScreen ? " layout--narrow" : ""}${narrowScreen && sidebarCollapsed ? " layout--narrow-rail" : ""}`}
+      >
+        {narrowScreen && !sidebarCollapsed && (
+          <button
+            type="button"
+            className="sidebar-backdrop"
+            aria-label="关闭侧栏"
+            onClick={toggleSidebar}
+          />
+        )}
         <aside
           id="app-sidebar"
           className={`sidebar${sidebarCollapsed ? " sidebar--collapsed" : ""}`}
           aria-label="主导航"
         >
+          <div className="sidebar-brand">
+            <img
+              className="brand-logo"
+              src="/punkrecords_logo.png"
+              alt="PunkRecords 班克记录"
+            />
+            <div className="brand-text">
+              <h1 className="product-name">PunkRecords · 班克记录</h1>
+              <p className="product-tagline">
+                像贝加庞克一样，将你的大脑外化为无限的智慧仓库。
+              </p>
+            </div>
+          </div>
+
           <nav className="sidebar-nav" aria-label="功能">
             {SIDEBAR_NAV.map((item) => (
               <button
@@ -323,20 +405,6 @@ export function App() {
               </button>
             ))}
           </nav>
-
-          <div className="sidebar-brand">
-            <img
-              className="brand-logo"
-              src="/punkrecords_logo.png"
-              alt="PunkRecords 班克记录"
-            />
-            <div className="brand-text">
-              <h1 className="product-name">PunkRecords · 班克记录</h1>
-              <p className="product-tagline">
-                像贝加庞克一样，将你的大脑外化为无限的智慧仓库。
-              </p>
-            </div>
-          </div>
         </aside>
 
         <section className="main-panel" aria-label="对话">
@@ -349,7 +417,11 @@ export function App() {
               aria-controls="app-sidebar"
               aria-label={sidebarCollapsed ? "展开侧栏" : "收起侧栏"}
             >
-              {sidebarCollapsed ? <IconChevronRight /> : <IconChevronLeft />}
+              {sidebarCollapsed ? (
+                <IconSidebarExpand />
+              ) : (
+                <IconSidebarCollapseToggle />
+              )}
             </button>
             <span className="main-topbar-title">班克记录</span>
           </header>

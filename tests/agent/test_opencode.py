@@ -1,6 +1,6 @@
 from pathlib import Path
-from punkrecords.agent.opencode import OpenCodeAgent
-from punkrecords.agent.base import IngestionResult, QueryResult, LintResult
+from src.agent.opencode import OpenCodeAgent
+from src.agent.base import IngestionResult, QueryResult, LintResult
 
 
 def test_opencode_agent_exists():

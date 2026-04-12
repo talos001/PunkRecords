@@ -20,23 +20,23 @@ class IndexVault(BaseVault):
         self._ensure_dirs()
 
     @property
-    def punkrecords_dir(self) -> Path:
-        """Get the .punkrecords directory for index storage."""
+    def index_state_dir(self) -> Path:
+        """Get the .punkrecords directory for index storage (legacy path name)."""
         return self.path / ".punkrecords"
 
     @property
     def graph_index_path(self) -> Path:
         """Path to graph index storage."""
-        return self.punkrecords_dir / "graph_index.json"
+        return self.index_state_dir / "graph_index.json"
 
     @property
     def wiki_index_path(self) -> Path:
         """Path to wiki index storage."""
-        return self.punkrecords_dir / "wiki_index.json"
+        return self.index_state_dir / "wiki_index.json"
 
     def _ensure_dirs(self) -> None:
         """Ensure required directories exist."""
-        self.punkrecords_dir.mkdir(exist_ok=True, parents=True)
+        self.index_state_dir.mkdir(exist_ok=True, parents=True)
         if not self.graph_index_path.exists():
             self.graph_index_path.write_text("{}", encoding="utf-8")
         if not self.wiki_index_path.exists():

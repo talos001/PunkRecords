@@ -56,7 +56,7 @@ def serve_cmd(host: str, port: int, reload: bool):
     import uvicorn
 
     uvicorn.run(
-        "punkrecords.api.app:app",
+        "src.api.app:app",
         host=host,
         port=port,
         reload=reload,
