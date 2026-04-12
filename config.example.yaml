@@ -10,6 +10,9 @@ domain_index_paths:
 
 default_agent_backend: "claude_code"
 
+# 聊天上传附件后是否自动摄取到索引（需已配置 domain_index_paths）
+chat_auto_ingest: false
+
 # --- LLM 三项（anthropic 适配器）：BASE URL、API Key、模型 ---
 # BASE URL：不填或 null 则用 SDK 默认（官方）；网关/代理时取消下一行注释并填写。
 # llm_base_url: "https://api.anthropic.com"

@@ -59,6 +59,8 @@
 | 异步 | 慢 ingest / 建图 → `job_ids` + `GET /jobs/{id}`（Plan C 可与部分条目合并实现）。 |
 | 图谱 / Obsidian | `GET /graph/open`、插件深链等，依赖索引路径与 URI 方案已定。 |
 
+**已部分实施**：`POST /api/v1/ingest`（与 CLI 等价）；配置 `chat_auto_ingest` 与聊天落盘后自动摄取（需 `domain_index_paths`）。
+
 ---
 
 ## 反模式（避免）
@@ -76,3 +78,4 @@
 | 2026-04-12 | 初稿：Plan B 按 1→2→3 递进，反模式说明 |
 | 2026-04-12 | 阶段 1 落地：`MaterialVault` 统一聊天上传路径与文件名；`chat_materials` 已接入 |
 | 2026-04-12 | 阶段 2 落地：`domain_index_paths`、摄取管线、`punkrecords ingest`、graph/wiki 索引合并 |
+| 2026-04-12 | 阶段 3 部分：`POST /ingest`、`chat_auto_ingest` |

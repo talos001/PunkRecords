@@ -29,6 +29,8 @@ class Config:
     llm_api_key: Optional[str] = None  # 未设时回退 agent_api_key
     llm_model: str = "claude-sonnet-4-20250514"
     llm_timeout_seconds: float = 120.0
+    chat_auto_ingest: bool = False
+    """``POST /chat`` 在附件落盘后是否自动对新材料执行摄取（需配置 ``domain_index_paths``）。"""
 
 
 def _llm_provider_from_yaml(data: dict) -> str:
@@ -61,6 +63,7 @@ def load_config(config_path: Path) -> Config:
         llm_api_key=_optional_nonempty_str(llm_key),
         llm_model=str(data.get("llm_model", "claude-sonnet-4-20250514")),
         llm_timeout_seconds=float(data.get("llm_timeout_seconds", 120.0)),
+        chat_auto_ingest=bool(data.get("chat_auto_ingest", False)),
     )
 
 
@@ -92,6 +95,8 @@ def default_config() -> Config:
             "PUNKRECORDS_LLM_MODEL", "claude-sonnet-4-20250514"
         ),
         llm_timeout_seconds=float(os.environ.get("PUNKRECORDS_LLM_TIMEOUT", "120")),
+        chat_auto_ingest=os.environ.get("PUNKRECORDS_CHAT_AUTO_INGEST", "").lower()
+        in ("1", "true", "yes"),
     )
 
 

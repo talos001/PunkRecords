@@ -69,3 +69,17 @@ class SettingsResponse(BaseModel):
     default_domain_id: Optional[str] = None
     theme: str = "light"
     language: str = "zh-CN"
+
+
+class IngestBody(BaseModel):
+    domain_id: str
+    relative_path: str
+    agent_id: Optional[str] = None
+    """覆盖 ``default_agent_backend``（如 ``claude_code``）。"""
+
+
+class IngestResponse(BaseModel):
+    success: bool
+    entity_count: int = 0
+    relation_count: int = 0
+    error_message: Optional[str] = None

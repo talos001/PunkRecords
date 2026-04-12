@@ -9,6 +9,7 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
 from src import __version__ as PKG_VERSION
+from src.ingest.service import ingest_material_file
 
 from ..agents_registry import AGENTS, DEFAULT_AGENT_ID, get_agent_meta
 from ..chat_materials import ChatAttachmentError
@@ -19,6 +20,8 @@ from ..schemas import (
     AgentsResponse,
     ChatResponse,
     DomainsResponse,
+    IngestBody,
+    IngestResponse,
     SettingsAgentBody,
     SettingsAgentResponse,
     SettingsResponse,
@@ -212,3 +215,26 @@ def get_settings() -> SettingsResponse:
         theme="light",
         language="zh-CN",
     )
+
+
+@router.post("/ingest", response_model=IngestResponse)
+def post_ingest(request: Request, body: IngestBody) -> IngestResponse:
+    """将材料 Vault 内单个文件摄取到指定领域的索引 Vault（与 CLI ``ingest`` 等价）。"""
+    if body.domain_id not in domain_ids():
+        raise HTTPException(status_code=400, detail="未知 domain_id")
+    cfg = request.app.state.config
+    try:
+        result = ingest_material_file(
+            cfg,
+            body.domain_id,
+            body.relative_path,
+            agent_backend=body.agent_id,
+        )
+        return IngestResponse(
+            success=result.success,
+            entity_count=len(result.entities),
+            relation_count=len(result.relations),
+            error_message=result.error_message,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e

@@ -114,6 +114,33 @@
 
 前端应用 `fetch` 读 body 流并按 `\n\n` 解析 `data:` 行；首字未到时可展示「等待/生成中」提示。
 
+### 3.3 单文件摄取（索引 Vault，与 CLI 等价）
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| `POST` | `/api/v1/ingest` | 将材料 Vault 内**已有**文件写入指定领域的 graph/wiki 索引 |
+
+**请求：`application/json`**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `domain_id` | string | 是 | 与 `domain_index_paths` 键一致 |
+| `relative_path` | string | 是 | 相对材料 Vault 根的路径（POSIX） |
+| `agent_id` | string | 否 | 覆盖 `default_agent_backend`，作为摄取后端 |
+
+**响应示例**
+
+```json
+{
+  "success": true,
+  "entity_count": 0,
+  "relation_count": 0,
+  "error_message": null
+}
+```
+
+**说明**：`POST /chat` 上传附件后，若服务端配置 `chat_auto_ingest: true`，可在对话完成后自动对新材料执行摄取（需已配置 `domain_index_paths` 且失败时仅记录日志，不阻断回复）。
+
 ---
 
 ## 4. 会话与历史（可选，用于「有消息后的列表 / 上下文」）
@@ -188,3 +215,4 @@
 |------|------|
 | 2026-04-12 | 初稿：健康、领域、对话、可选会话/任务/Agent/设置/图谱 |
 | 2026-04-12 | 已实现 P0：`GET /health`、`GET /version`、`GET /domains`、`POST /chat`、`GET /agents`、`GET|PUT /settings/agent`、`GET /settings`（见 `src/api/`） |
+| 2026-04-12 | 已实现：`POST /chat/stream`（SSE）、`POST /ingest`、配置项 `chat_auto_ingest` |

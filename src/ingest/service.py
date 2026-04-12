@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
+
+from src.api.chat_materials import SavedMaterial
+
+_log = logging.getLogger(__name__)
 
 # 确保各 Agent 在 get_agent_registry 中完成注册
 import src.agent.claude_code  # noqa: F401
@@ -94,3 +99,33 @@ def ingest_material_file(
 def material_vault_for_config(config: Config) -> MaterialVault:
     """材料 Vault 封装（只读遍历等）。"""
     return MaterialVault(config.materials_vault_path.expanduser().resolve())
+
+
+def ingest_chat_saved_files(
+    config: Config,
+    domain_id: str,
+    saved: List[SavedMaterial],
+    *,
+    agent_backend: Optional[str] = None,
+) -> None:
+    """
+    在「聊天已落盘附件」后同步调用（供 CLI/HTTP 线程化封装使用）。
+    若 ``chat_auto_ingest`` 为 False 或 ``saved`` 为空则不做任何事。
+    """
+    if not getattr(config, "chat_auto_ingest", False) or not saved:
+        return
+    backend = agent_backend or config.default_agent_backend
+    for s in saved:
+        try:
+            ingest_material_file(
+                config,
+                domain_id,
+                s.relative_posix,
+                agent_backend=backend,
+            )
+        except Exception as e:
+            _log.warning(
+                "聊天后自动摄取失败: path=%s, err=%s",
+                s.relative_posix,
+                e,
+            )

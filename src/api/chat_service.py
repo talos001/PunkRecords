@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import logging
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -8,12 +10,37 @@ from typing import AsyncIterator, List, Tuple
 from fastapi import UploadFile
 
 from src.config import Config
+from src.ingest.service import ingest_chat_saved_files
 from src.llm import LLMRegistry
 from src.llm.types import Message
 
 from .chat_materials import SavedMaterial, save_chat_uploads
 from .chat_profiles import ChatProfile, get_chat_profile
 from .schemas import ChatMessageOut, ChatResponse
+
+_log = logging.getLogger(__name__)
+
+
+async def _maybe_ingest_after_chat(
+    config: Config,
+    domain_id: str,
+    saved: List[SavedMaterial],
+) -> None:
+    if not config.chat_auto_ingest or not saved:
+        return
+
+    def _run() -> None:
+        ingest_chat_saved_files(
+            config,
+            domain_id,
+            saved,
+            agent_backend=config.default_agent_backend,
+        )
+
+    try:
+        await asyncio.to_thread(_run)
+    except Exception as e:
+        _log.warning("聊天后自动摄取批次失败: %s", e)
 
 
 def _build_user_content(
@@ -77,7 +104,7 @@ async def run_chat(
     registry: LLMRegistry,
     config: Config,
 ) -> ChatResponse:
-    messages, profile, _saved = await prepare_chat_messages(
+    messages, profile, saved = await prepare_chat_messages(
         domain_id=domain_id,
         domain_name=domain_name,
         agent_id=agent_id,
@@ -92,6 +119,7 @@ async def run_chat(
         model=model,
         temperature=profile.temperature,
     )
+    await _maybe_ingest_after_chat(config, domain_id, saved)
     now = datetime.now(timezone.utc)
     created = now.isoformat().replace("+00:00", "Z")
     return ChatResponse(
@@ -116,7 +144,7 @@ async def run_chat_stream(
     registry: LLMRegistry,
     config: Config,
 ) -> AsyncIterator[str]:
-    messages, profile, _saved = await prepare_chat_messages(
+    messages, profile, saved = await prepare_chat_messages(
         domain_id=domain_id,
         domain_name=domain_name,
         agent_id=agent_id,
@@ -133,3 +161,4 @@ async def run_chat_stream(
     ):
         if chunk:
             yield chunk
+    await _maybe_ingest_after_chat(config, domain_id, saved)

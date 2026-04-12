@@ -82,6 +82,8 @@ poetry run punkrecords --config /path/to/config.yaml ingest -d math math/incomin
 
 未传 `--config` 时，若当前工作目录存在 `config.yaml` 会自动加载。详见 [`docs/plan-b-vault-pipeline.md`](docs/plan-b-vault-pipeline.md)。
 
+配置 **`chat_auto_ingest: true`** 且已配置 **`domain_index_paths`** 时，`POST /chat` 在附件落盘并生成回复后，会尝试自动摄取新材料（失败仅打日志）。亦可显式调用 **`POST /api/v1/ingest`**（见 [`docs/api-outline.md`](docs/api-outline.md) 3.3）。
+
 ### Web 前端
 
 ```bash
