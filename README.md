@@ -24,6 +24,7 @@
 
 - **[UI 设计规范](docs/ui_design.md)**：客户端界面、交互与文案原则；**后续所有 UI 相关设计均须在该文件中维护与更新**（单一事实来源）。
 - **[API 接口需求](docs/api-outline.md)**：前后端联调所需的 REST/文件上传/可选流式与 Agent、设置等接口轮廓。
+- **[Chat + LLM 实现计划](docs/backend-chat-llm-implementation-plan.md)**：`POST /chat` 落盘、LLM 适配器与 ChatProfile（P0）的分步落地顺序与测试清单。
 
 ## 架构概览
 
