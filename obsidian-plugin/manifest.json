@@ -1,0 +1,10 @@
+{
+  "id": "punkrecords",
+  "name": "PunkRecords",
+  "version": "0.1.0",
+  "description": "Connect your Obsidian vault to PunkRecords AI knowledge graph",
+  "author": "",
+  "authorUrl": "",
+  "isDesktopOnly": false,
+  "minAppVersion": "0.12.0"
+}
