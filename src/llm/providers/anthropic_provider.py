@@ -14,9 +14,15 @@ class AnthropicLLMProvider:
         self,
         *,
         api_key: str,
+        base_url: str | None = None,
+        default_model: str = "claude-sonnet-4-20250514",
         timeout_seconds: float = 120.0,
     ) -> None:
-        self._client = AsyncAnthropic(api_key=api_key, timeout=timeout_seconds)
+        client_kw: dict = {"api_key": api_key, "timeout": timeout_seconds}
+        if base_url:
+            client_kw["base_url"] = base_url
+        self._client = AsyncAnthropic(**client_kw)
+        self._default_model = default_model
 
     async def complete(
         self,
@@ -26,7 +32,7 @@ class AnthropicLLMProvider:
         temperature: float | None,
     ) -> CompletionResult:
         system, anthropic_messages = _to_anthropic_messages(messages)
-        use_model = model or "claude-sonnet-4-20250514"
+        use_model = model or self._default_model
         kwargs: dict = {
             "model": use_model,
             "max_tokens": 4096,

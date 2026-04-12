@@ -57,10 +57,10 @@ PunkRecords 相信：
 
 可选环境变量（`POST /chat` 与材料落盘）：
 
-- `PUNKRECORDS_CONFIG`：YAML 路径，见仓库内 [`config.example.yaml`](config.example.yaml)。
+- `PUNKRECORDS_CONFIG`：YAML 路径，见仓库内 [`config.example.yaml`](config.example.yaml)（推荐在 YAML 中配置 **BASE URL / API Key / model** 三项：`llm_base_url`、`llm_api_key`、`llm_model`）。
 - `PUNKRECORDS_MATERIALS_VAULT`：未指定配置文件时，材料 Vault 根目录（默认 `./var/materials_vault`，启动时会创建）。
 - `PUNKRECORDS_LLM_PROVIDER`：`fake`（默认，占位回复）或 `anthropic`。
-- `ANTHROPIC_API_KEY`：选用 `anthropic` 时在环境中提供（勿提交仓库）。
+- **LLM 三项（与 YAML 等价，便于本机调试）**：`PUNKRECORDS_LLM_BASE_URL`（或 `ANTHROPIC_BASE_URL`）、`PUNKRECORDS_LLM_API_KEY`（或 `ANTHROPIC_API_KEY`）、`PUNKRECORDS_LLM_MODEL`。
 
 ```bash
 poetry install

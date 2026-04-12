@@ -48,7 +48,7 @@
 ## 实现顺序（建议）
 
 1. **类型与协议**（`types.py` + `base.py`）+ **FakeProvider** + **registry 骨架**（`fake` 可实例化）。
-2. **扩展 Config + 示例 `config.example.yaml`**（仓库内示例，真实路径由用户填写）+ `app.state` 注入。
+2. **扩展 Config + 示例 `config.example.yaml`**：`llm_base_url`、`llm_api_key`、`llm_model` 三项（及 `agent_api_key` 兼容）+ `app.state` 注入。
 3. **`chat_profiles.py`**：三张 profile，与 `agents_registry` 中 id 一致；文案可中文短 system。
 4. **`chat_materials.py`**：落盘 + 单元测试（临时目录 `tmp_path`）。
 5. **`chat_service.py`**：串联 fake provider，测端到端消息组装与 `ChatResponse`。

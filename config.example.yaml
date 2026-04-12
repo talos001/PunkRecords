@@ -4,9 +4,14 @@ materials_vault_path: "~/Obsidian/MaterialsVault"
 domain_index_paths: {}
 default_agent_backend: "claude_code"
 
-# 可选：与 Anthropic 一致时可用 agent_api_key，或仅用环境变量 ANTHROPIC_API_KEY
+# --- LLM 三项（anthropic 适配器）：BASE URL、API Key、模型 ---
+# BASE URL：不填或 null 则用 SDK 默认（官方）；网关/代理时取消下一行注释并填写。
+# llm_base_url: "https://api.anthropic.com"
+llm_api_key: "sk-ant-..."
+llm_model: "claude-sonnet-4-20250514"
+
+# 兼容旧字段：仅当未设置 llm_api_key 时作为 Key 来源
 # agent_api_key: "sk-ant-..."
 
 llm_provider: "anthropic"
-llm_model: "claude-sonnet-4-20250514"
 llm_timeout_seconds: 120

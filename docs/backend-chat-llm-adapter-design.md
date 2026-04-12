@@ -75,7 +75,7 @@ POST /chat (multipart)
   - `LLMProvider.complete(*, messages: list[Message], model: str | None, temperature: float | None, ...) -> CompletionResult`
   - `CompletionResult` 至少含：`text: str`；可选 `finish_reason`、usage，便于观测与计费预留。
 - **注册**：`LLMProviderRegistry` 或简单 dict：`provider_id` → 工厂/实例。P0 可先支持 **一个** 厂商（如 Anthropic 或 OpenAI），第二个厂商新增一个类即可。
-- **配置**：延续并扩展 `config.yaml` / 环境变量：`materials_vault_path` 已有；增加如 `llm_provider`（默认厂商）、`llm_model`、`ANTHROPIC_API_KEY` / `OPENAI_API_KEY` 等（具体键名在实现时与 `config.py` 对齐）。
+- **配置**：`llm_base_url`（兼容网关/代理）、`llm_api_key`、`llm_model` 三项；环境变量对应 `PUNKRECORDS_LLM_BASE_URL` / `ANTHROPIC_BASE_URL`、`PUNKRECORDS_LLM_API_KEY` / `ANTHROPIC_API_KEY`、`PUNKRECORDS_LLM_MODEL`；未填 BASE URL 时走 SDK 默认官方端点。
 
 ---
 

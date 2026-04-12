@@ -30,16 +30,21 @@ class LLMRegistry:
             return FakeLLMProvider()
         if provider_id == "anthropic":
             key = (
-                self._config.agent_api_key
+                self._config.llm_api_key
+                or self._config.agent_api_key
+                or os.environ.get("PUNKRECORDS_LLM_API_KEY")
                 or os.environ.get("ANTHROPIC_API_KEY")
                 or ""
             ).strip()
             if not key:
                 raise ValueError(
-                    "未配置 Anthropic API Key（config.agent_api_key 或环境变量 ANTHROPIC_API_KEY）"
+                    "未配置 LLM API Key（llm_api_key / agent_api_key 或环境变量 "
+                    "PUNKRECORDS_LLM_API_KEY / ANTHROPIC_API_KEY）"
                 )
             return AnthropicLLMProvider(
                 api_key=key,
+                base_url=self._config.llm_base_url,
+                default_model=self._config.llm_model,
                 timeout_seconds=self._config.llm_timeout_seconds,
             )
         raise ValueError(f"不支持的 llm_provider: {provider_id}")
