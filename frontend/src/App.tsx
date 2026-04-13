@@ -234,9 +234,11 @@ export function App() {
   const [customPath, setCustomPath] = useState("");
   const [pathError, setPathError] = useState("");
   const [pathSubmitting, setPathSubmitting] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const messagesRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
   /** 流式请求中止（切换领域时打断） */
   const streamAbortRef = useRef<AbortController | null>(null);
   /** 离线演示回复的定时器（切换领域时清除） */
@@ -376,6 +378,7 @@ export function App() {
     if (authState === "anonymous") {
       setShowAuthModal(Boolean(pendingAction));
       setShowPathModal(false);
+      setUserMenuOpen(false);
       return;
     }
     if (authState === "authenticated_unconfigured") {
@@ -387,12 +390,35 @@ export function App() {
     setShowPathModal(false);
   }, [authState, pendingAction]);
 
+  useEffect(() => {
+    if (!userMenuOpen) return;
+    const onPointerDown = (e: MouseEvent) => {
+      if (!userMenuRef.current?.contains(e.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    };
+    window.addEventListener("mousedown", onPointerDown);
+    return () => window.removeEventListener("mousedown", onPointerDown);
+  }, [userMenuOpen]);
+
   const clearSession = useCallback(() => {
     setAccessToken(null);
     setRefreshToken(null);
     setBootstrap(null);
     setAuthState("anonymous");
+    setUserMenuOpen(false);
   }, []);
+
+  const handleLogout = useCallback(async () => {
+    if (accessToken) {
+      try {
+        await authLogout({ baseUrl: API_BASE_URL, accessToken });
+      } catch {
+        /* ignore */
+      }
+    }
+    clearSession();
+  }, [accessToken, clearSession]);
 
   const ensureReady = useCallback((action: PendingAction): boolean => {
     if (!useLiveApi) return true;
@@ -660,6 +686,34 @@ export function App() {
               </button>
             ))}
           </nav>
+          {useLiveApi && authState !== "anonymous" && (
+            <div className="sidebar-user" ref={userMenuRef}>
+              <button
+                type="button"
+                className="sidebar-user-trigger"
+                onClick={() => setUserMenuOpen((v) => !v)}
+                title={bootstrap?.user.username ?? "用户"}
+              >
+                <span className="sidebar-user-avatar">
+                  {(bootstrap?.user.username ?? "用").slice(0, 1).toUpperCase()}
+                </span>
+                <span className="sidebar-user-name">
+                  {bootstrap?.user.username ?? "用户"}
+                </span>
+              </button>
+              {userMenuOpen && (
+                <div className="sidebar-user-menu">
+                  <button
+                    type="button"
+                    className="sidebar-user-menu-item"
+                    onClick={() => void handleLogout()}
+                  >
+                    退出登录
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </aside>
 
         <section className="main-panel" aria-label="对话">
@@ -801,27 +855,6 @@ export function App() {
                 </button>
               </div>
             </footer>
-            {useLiveApi && authState !== "anonymous" && (
-              <div className="auth-indicator">
-                已登录：{bootstrap?.user.username ?? "用户"}
-                <button
-                  type="button"
-                  className="auth-logout"
-                  onClick={async () => {
-                    if (accessToken) {
-                      try {
-                        await authLogout({ baseUrl: API_BASE_URL, accessToken });
-                      } catch {
-                        /* ignore */
-                      }
-                    }
-                    clearSession();
-                  }}
-                >
-                  退出登录
-                </button>
-              </div>
-            )}
           </div>
         </section>
       </div>
