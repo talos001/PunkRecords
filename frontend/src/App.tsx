@@ -9,7 +9,6 @@ import {
 import { postChatStream } from "./api/chat";
 import { apiDomainsToLocal, fetchDomains } from "./api/domains";
 import {
-  PRODUCT_TAGLINE,
   PYTHAGORAS_BUBBLE_LABEL,
   PYTHAGORAS_THINKING,
 } from "./brand";
@@ -469,10 +468,6 @@ export function App() {
               src="/punkrecords_logo.png"
               alt="PunkRecords 班克记录"
             />
-            <div className="brand-text">
-              <h1 className="product-name">PunkRecords · 班克记录</h1>
-              <p className="product-tagline">{PRODUCT_TAGLINE}</p>
-            </div>
           </div>
 
           <nav className="sidebar-nav" aria-label="功能">
