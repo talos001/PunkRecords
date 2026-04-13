@@ -1,5 +1,6 @@
 ---
-title: "F-1 用户认证与首登路径确认设计"
+
+## title: "F-1 用户认证与首登路径确认设计"
 type: spec
 status: draft
 owner: "agent"
@@ -9,7 +10,6 @@ related_docs:
   - docs/function_plan.md
   - docs/ui_design.md
   - docs/api-outline.md
----
 
 # F-1 用户认证与首登路径确认设计
 
@@ -89,11 +89,11 @@ related_docs:
 
 1. 说明“材料将保存到哪里”与后续影响（用户可理解文案）。
 2. 选择模式：
-   - 使用默认路径（显示默认路径值）。
-   - 自定义路径（输入并校验）。
+  - 使用默认路径（显示默认路径值）。
+  - 自定义路径（输入并校验）。
 3. 确认页（必经）：
-   - 显示“当前生效路径”。
-   - 用户点击“确认并继续”后，状态转为 `authenticated_ready`。
+  - 显示“当前生效路径”。
+  - 用户点击“确认并继续”后，状态转为 `authenticated_ready`。
 
 满足已确认策略：允许跳过自定义，但不能跳过最终确认。
 
