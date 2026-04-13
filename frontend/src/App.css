@@ -436,6 +436,124 @@ body {
   opacity: 0.5;
 }
 
+.domain-manager {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 0.85rem;
+  margin: 0 0 0.85rem;
+}
+
+.domain-manager-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.domain-manager-header h3 {
+  margin: 0;
+  font-size: 0.92rem;
+}
+
+.domain-manager-back,
+.domain-manager-toggle {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text);
+  padding: 0.3rem 0.55rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.domain-manager-hint {
+  margin: 0.55rem 0 0.75rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.domain-manager-error,
+.domain-manager-success {
+  margin: 0 0 0.6rem;
+  font-size: 0.8rem;
+}
+
+.domain-manager-error {
+  color: #b91c1c;
+}
+
+.domain-manager-success {
+  color: #15803d;
+}
+
+.domain-form {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.65rem;
+  margin-bottom: 0.6rem;
+}
+
+.domain-form:last-child {
+  margin-bottom: 0;
+}
+
+.domain-form-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.82rem;
+  margin-bottom: 0.55rem;
+}
+
+.domain-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 120px;
+  gap: 0.45rem;
+}
+
+.domain-input {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.48rem 0.55rem;
+  font-size: 0.82rem;
+  width: 100%;
+}
+
+.domain-input--full {
+  grid-column: 1 / -1;
+}
+
+.domain-action-row {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 0.45rem;
+}
+
+.domain-action-primary,
+.domain-action-danger {
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.domain-action-primary {
+  background: var(--accent);
+}
+
+.domain-action-danger {
+  background: #dc2626;
+}
+
+.domain-action-primary:disabled,
+.domain-action-danger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .chat {
   flex: 1;
   min-height: 0;
@@ -748,6 +866,10 @@ body {
 @media (max-width: 800px) {
   .main-inner {
     padding: 1rem 1rem 1.25rem;
+  }
+
+  .domain-form-grid {
+    grid-template-columns: 1fr;
   }
 
   .messages {

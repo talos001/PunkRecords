@@ -17,7 +17,13 @@ import {
   type Bootstrap,
 } from "./api/auth";
 import { ApiHttpError, postChatStream } from "./api/chat";
-import { apiDomainsToLocal, fetchDomains } from "./api/domains";
+import {
+  apiDomainsToLocal,
+  createDomain,
+  deleteDomain,
+  fetchDomains,
+  updateDomain,
+} from "./api/domains";
 import {
   PYTHAGORAS_BUBBLE_LABEL,
   PYTHAGORAS_THINKING,
@@ -235,6 +241,17 @@ export function App() {
   const [pathError, setPathError] = useState("");
   const [pathSubmitting, setPathSubmitting] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [creatingDomain, setCreatingDomain] = useState(false);
+  const [domainMutating, setDomainMutating] = useState(false);
+  const [domainError, setDomainError] = useState("");
+  const [domainSuccess, setDomainSuccess] = useState("");
+  const [newDomainName, setNewDomainName] = useState("");
+  const [newDomainDescription, setNewDomainDescription] = useState("");
+  const [newDomainEmoji, setNewDomainEmoji] = useState("📁");
+  const [editingDomainId, setEditingDomainId] = useState("");
+  const [editingDomainName, setEditingDomainName] = useState("");
+  const [editingDomainDescription, setEditingDomainDescription] = useState("");
+  const [editingDomainEmoji, setEditingDomainEmoji] = useState("📁");
   const messagesRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -329,17 +346,35 @@ export function App() {
     setSending(false);
   }, [domainId]);
 
+  const refreshDomains = useCallback(
+    async (preferredDomainId?: string) => {
+      const res = await fetchDomains(API_BASE_URL);
+      const { domains, defaultDomainId } = apiDomainsToLocal(res);
+      const activeDomainIds = new Set(
+        domains.filter((d) => d.status === "active").map((d) => d.id),
+      );
+      const nextDomainId =
+        (preferredDomainId && activeDomainIds.has(preferredDomainId)
+          ? preferredDomainId
+          : undefined) ??
+        (activeDomainIds.has(domainId) ? domainId : undefined) ??
+        (activeDomainIds.has(defaultDomainId) ? defaultDomainId : undefined) ??
+        domains.find((d) => d.status === "active")?.id ??
+        domains[0]?.id ??
+        DEFAULT_DOMAIN_ID;
+      setDomainsList(domains);
+      setDomainId(nextDomainId);
+      return domains;
+    },
+    [domainId],
+  );
+
   useEffect(() => {
     if (!useLiveApi) return;
     let cancelled = false;
-    fetchDomains(API_BASE_URL)
-      .then((res) => {
+    refreshDomains()
+      .then(() => {
         if (cancelled) return;
-        const { domains, defaultDomainId } = apiDomainsToLocal(res);
-        setDomainsList(domains);
-        setDomainId((prev) =>
-          domains.some((d) => d.id === prev) ? prev : defaultDomainId,
-        );
       })
       .catch(() => {
         if (!cancelled) setDomainsList(DOMAINS);
@@ -347,7 +382,7 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refreshDomains]);
 
   useEffect(() => {
     saveDomainId(domainId);
@@ -453,6 +488,21 @@ export function App() {
     () => domainsList.find((d) => d.id === domainId) ?? domainsList[0],
     [domainId, domainsList],
   );
+  const activeDomains = useMemo(
+    () => domainsList.filter((d) => d.status === "active"),
+    [domainsList],
+  );
+
+  useEffect(() => {
+    if (!domainsList.length) return;
+    const target =
+      domainsList.find((d) => d.id === editingDomainId) ?? domainsList[0];
+    if (!target) return;
+    setEditingDomainId(target.id);
+    setEditingDomainName(target.name);
+    setEditingDomainDescription(target.description);
+    setEditingDomainEmoji(target.emoji || "📁");
+  }, [domainsList, editingDomainId]);
 
   const toggleSidebar = useCallback(() => {
     setSidebarCollapsed((c) => !c);
@@ -748,7 +798,7 @@ export function App() {
               role="radiogroup"
               aria-label="选择知识区域"
             >
-              {domainsList.map((d) => (
+              {activeDomains.map((d) => (
                 <button
                   key={d.id}
                   type="button"
@@ -770,6 +820,251 @@ export function App() {
               <span className="context-hint-dot">·</span>
               {currentDomain.description}
             </p>
+
+            {navActive === "settings" && (
+              <section className="domain-manager" aria-label="领域管理">
+                <div className="domain-manager-header">
+                  <h3>领域管理</h3>
+                  <button
+                    type="button"
+                    className="domain-manager-back"
+                    onClick={() => setNavActive("home")}
+                  >
+                    返回聊天
+                  </button>
+                </div>
+                <p className="domain-manager-hint">
+                  支持新增、编辑与归档。归档会先尝试删除，若领域非空则自动改为归档。
+                </p>
+                {domainError && <p className="domain-manager-error">{domainError}</p>}
+                {domainSuccess && (
+                  <p className="domain-manager-success">{domainSuccess}</p>
+                )}
+
+                <form
+                  className="domain-form"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!ensureReady("settings")) return;
+                    if (!accessToken || !newDomainName.trim()) return;
+                    setDomainMutating(true);
+                    setDomainError("");
+                    setDomainSuccess("");
+                    void createDomain({
+                      baseUrl: API_BASE_URL,
+                      accessToken,
+                      body: {
+                        name: newDomainName.trim(),
+                        description: newDomainDescription.trim(),
+                        emoji: newDomainEmoji.trim() || "📁",
+                      },
+                    })
+                      .then((res) => refreshDomains(res.domain.id))
+                      .then((domains) => {
+                        const created = domains.find(
+                          (d) =>
+                            d.name === newDomainName.trim() &&
+                            d.description === newDomainDescription.trim(),
+                        );
+                        if (created) {
+                          setEditingDomainId(created.id);
+                          setEditingDomainName(created.name);
+                          setEditingDomainDescription(created.description);
+                          setEditingDomainEmoji(created.emoji || "📁");
+                        }
+                        setNewDomainName("");
+                        setNewDomainDescription("");
+                        setNewDomainEmoji("📁");
+                        setCreatingDomain(false);
+                        setDomainSuccess("领域已创建并选中。");
+                      })
+                      .catch((e: unknown) => {
+                        setDomainError(
+                          e instanceof Error ? e.message : "新增领域失败",
+                        );
+                      })
+                      .finally(() => {
+                        setDomainMutating(false);
+                      });
+                  }}
+                >
+                  <div className="domain-form-header">
+                    <strong>新增领域</strong>
+                    <button
+                      type="button"
+                      className="domain-manager-toggle"
+                      onClick={() => setCreatingDomain((v) => !v)}
+                    >
+                      {creatingDomain ? "收起" : "展开"}
+                    </button>
+                  </div>
+                  {creatingDomain && (
+                    <div className="domain-form-grid">
+                      <input
+                        className="domain-input"
+                        placeholder="领域名称（必填）"
+                        value={newDomainName}
+                        onChange={(e) => setNewDomainName(e.target.value)}
+                      />
+                      <input
+                        className="domain-input"
+                        placeholder="Emoji（如 📚）"
+                        value={newDomainEmoji}
+                        onChange={(e) => setNewDomainEmoji(e.target.value)}
+                      />
+                      <input
+                        className="domain-input domain-input--full"
+                        placeholder="领域描述"
+                        value={newDomainDescription}
+                        onChange={(e) => setNewDomainDescription(e.target.value)}
+                      />
+                      <button
+                        type="submit"
+                        className="domain-action-primary"
+                        disabled={domainMutating || !newDomainName.trim()}
+                      >
+                        {domainMutating ? "提交中..." : "新增并选中"}
+                      </button>
+                    </div>
+                  )}
+                </form>
+
+                <div className="domain-form">
+                  <div className="domain-form-header">
+                    <strong>编辑领域</strong>
+                  </div>
+                  <div className="domain-form-grid">
+                    <select
+                      className="domain-input"
+                      value={editingDomainId}
+                      onChange={(e) => {
+                        const target = domainsList.find(
+                          (d) => d.id === e.target.value,
+                        );
+                        if (!target) return;
+                        setEditingDomainId(target.id);
+                        setEditingDomainName(target.name);
+                        setEditingDomainDescription(target.description);
+                        setEditingDomainEmoji(target.emoji || "📁");
+                      }}
+                    >
+                      {domainsList.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name} {d.status === "archived" ? "（已归档）" : ""}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      className="domain-input"
+                      placeholder="Emoji（如 📚）"
+                      value={editingDomainEmoji}
+                      onChange={(e) => setEditingDomainEmoji(e.target.value)}
+                    />
+                    <input
+                      className="domain-input domain-input--full"
+                      placeholder="领域名称"
+                      value={editingDomainName}
+                      onChange={(e) => setEditingDomainName(e.target.value)}
+                    />
+                    <input
+                      className="domain-input domain-input--full"
+                      placeholder="领域描述"
+                      value={editingDomainDescription}
+                      onChange={(e) => setEditingDomainDescription(e.target.value)}
+                    />
+                    <div className="domain-action-row">
+                      <button
+                        type="button"
+                        className="domain-action-primary"
+                        disabled={domainMutating || !editingDomainId}
+                        onClick={() => {
+                          if (!ensureReady("settings")) return;
+                          if (!accessToken || !editingDomainId) return;
+                          setDomainMutating(true);
+                          setDomainError("");
+                          setDomainSuccess("");
+                          void updateDomain({
+                            baseUrl: API_BASE_URL,
+                            accessToken,
+                            domainId: editingDomainId,
+                            body: {
+                              name: editingDomainName.trim(),
+                              description: editingDomainDescription.trim(),
+                              emoji: editingDomainEmoji.trim() || "📁",
+                            },
+                          })
+                            .then(() => refreshDomains(editingDomainId))
+                            .then(() => {
+                              setDomainSuccess("领域基础信息已更新。");
+                            })
+                            .catch((e: unknown) => {
+                              setDomainError(
+                                e instanceof Error ? e.message : "更新领域失败",
+                              );
+                            })
+                            .finally(() => {
+                              setDomainMutating(false);
+                            });
+                        }}
+                      >
+                        {domainMutating ? "处理中..." : "保存编辑"}
+                      </button>
+                      <button
+                        type="button"
+                        className="domain-action-danger"
+                        disabled={domainMutating || !editingDomainId}
+                        onClick={() => {
+                          if (!ensureReady("settings")) return;
+                          if (!accessToken || !editingDomainId) return;
+                          setDomainMutating(true);
+                          setDomainError("");
+                          setDomainSuccess("");
+                          void deleteDomain({
+                            baseUrl: API_BASE_URL,
+                            accessToken,
+                            domainId: editingDomainId,
+                          })
+                            .then(async () => {
+                              await refreshDomains();
+                              setDomainSuccess("领域已删除。");
+                            })
+                            .catch(async (e: unknown) => {
+                              if (
+                                e instanceof ApiHttpError &&
+                                e.status === 409 &&
+                                e.code === "DOMAIN_NOT_EMPTY"
+                              ) {
+                                await updateDomain({
+                                  baseUrl: API_BASE_URL,
+                                  accessToken,
+                                  domainId: editingDomainId,
+                                  body: { enabled: false },
+                                });
+                                await refreshDomains();
+                                setDomainSuccess(
+                                  "领域包含内容，已自动改为归档状态。",
+                                );
+                                return;
+                              }
+                              throw e;
+                            })
+                            .catch((e: unknown) => {
+                              setDomainError(
+                                e instanceof Error ? e.message : "归档领域失败",
+                              );
+                            })
+                            .finally(() => {
+                              setDomainMutating(false);
+                            });
+                        }}
+                      >
+                        归档 / 删除
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            )}
 
             <main className="chat">
               <div className="messages" ref={messagesRef}>
