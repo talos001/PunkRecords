@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import json
-import re
 from pathlib import Path
-from threading import Lock
 from typing import Any, List, TypedDict
 
+from .domain_store import DomainRecord, DomainStore
 
 class DomainDict(TypedDict, total=False):
     id: str
@@ -62,55 +60,51 @@ _INITIAL_DOMAINS: List[DomainDict] = [
 ]
 
 DEFAULT_DOMAIN_ID = "early-childhood"
-_LOCK = Lock()
+_STORE_PATH = Path(__file__).resolve().parents[2] / "var" / "domains" / "domains.sqlite3"
+_STORE = DomainStore(_STORE_PATH)
+_BOOTSTRAPPED = False
 
 
-def _domains_file_path() -> Path:
-    return Path.cwd() / "var" / "domains" / "domains.json"
-
-
-def _normalize_domain(domain: DomainDict) -> DomainDict:
+def _record_to_domain(rec: DomainRecord) -> DomainDict:
     return {
-        "id": str(domain.get("id") or "").strip(),
-        "name": str(domain.get("name") or "").strip(),
-        "description": str(domain.get("description") or ""),
-        "emoji": str(domain.get("emoji") or ""),
-        "variant": str(domain.get("variant") or "coral"),
-        "enabled": bool(domain.get("enabled", True)),
+        "id": rec.id,
+        "name": rec.name,
+        "description": rec.description,
+        "emoji": rec.emoji,
+        "variant": rec.variant,
+        "enabled": rec.enabled and (not rec.is_archived),
     }
 
 
-def _load_all_domains() -> list[DomainDict]:
-    p = _domains_file_path()
-    if not p.is_file():
-        return [dict(d) for d in _INITIAL_DOMAINS]
-    raw = json.loads(p.read_text(encoding="utf-8"))
-    if not isinstance(raw, dict):
-        return [dict(d) for d in _INITIAL_DOMAINS]
-    items = raw.get("domains")
-    if not isinstance(items, list):
-        return [dict(d) for d in _INITIAL_DOMAINS]
+def configure_domain_store(store_path: Path) -> None:
+    global _STORE, _STORE_PATH, _BOOTSTRAPPED
+    _STORE_PATH = store_path
+    _STORE = DomainStore(_STORE_PATH)
+    _BOOTSTRAPPED = False
+
+
+def _ensure_bootstrapped() -> None:
+    global _BOOTSTRAPPED
+    if _BOOTSTRAPPED:
+        return
+    for item in _INITIAL_DOMAINS:
+        _STORE.seed_domain(
+            domain_id=item["id"],
+            name=item["name"],
+            description=item.get("description", ""),
+            emoji=item.get("emoji", ""),
+            variant=item.get("variant", "coral"),
+            enabled=bool(item.get("enabled", True)),
+        )
+    _BOOTSTRAPPED = True
+
+
+def _list_active_domains() -> list[DomainDict]:
+    _ensure_bootstrapped()
     out: list[DomainDict] = []
-    for item in items:
-        if isinstance(item, dict):
-            norm = _normalize_domain(item)
-            if norm["id"] and norm["name"]:
-                out.append(norm)
-    return out or [dict(d) for d in _INITIAL_DOMAINS]
-
-
-def _save_all_domains(domains: list[DomainDict]) -> None:
-    p = _domains_file_path()
-    p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(
-        json.dumps({"domains": domains}, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
-
-
-def _slugify(name: str) -> str:
-    base = re.sub(r"[^a-z0-9]+", "-", (name or "").strip().lower()).strip("-")
-    return base or "domain"
+    for rec in _STORE.list_domains(view="active"):
+        out.append(_record_to_domain(rec))
+    return out
 
 
 def create_domain(
@@ -123,59 +117,41 @@ def create_domain(
     clean_name = (name or "").strip()
     if not clean_name:
         raise ValueError("name is required")
-    with _LOCK:
-        domains = _load_all_domains()
-        base = _slugify(clean_name)
-        ids = {str(d.get("id") or "") for d in domains}
-        idx = 1
-        candidate = base
-        while candidate in ids:
-            idx += 1
-            candidate = f"{base}-{idx}"
-        domain: DomainDict = {
-            "id": candidate,
-            "name": clean_name,
-            "description": description or "",
-            "emoji": emoji or "",
-            "variant": variant or "coral",
-            "enabled": True,
-        }
-        domains.append(domain)
-        _save_all_domains(domains)
-        return dict(domain)
+    _ensure_bootstrapped()
+    rec = _STORE.create_domain(
+        name=clean_name,
+        description=description or "",
+        emoji=emoji or "",
+        variant=variant or "coral",
+    )
+    return _record_to_domain(rec)
 
 
 def update_domain(domain_id: str, updates: dict[str, Any]) -> DomainDict | None:
-    with _LOCK:
-        domains = _load_all_domains()
-        for idx, item in enumerate(domains):
-            if item.get("id") != domain_id:
-                continue
-            updated = dict(item)
-            if "name" in updates and str(updates.get("name") or "").strip():
-                updated["name"] = str(updates["name"]).strip()
-            if "description" in updates:
-                updated["description"] = str(updates.get("description") or "")
-            if "emoji" in updates:
-                updated["emoji"] = str(updates.get("emoji") or "")
-            if "variant" in updates and str(updates.get("variant") or "").strip():
-                updated["variant"] = str(updates["variant"]).strip()
-            if "enabled" in updates:
-                updated["enabled"] = bool(updates.get("enabled"))
-            domains[idx] = _normalize_domain(updated)
-            _save_all_domains(domains)
-            return dict(domains[idx])
-    return None
+    _ensure_bootstrapped()
+    current = _STORE.get_domain(domain_id)
+    if current is None:
+        return None
+    raw_name = updates.get("name") if "name" in updates else None
+    if raw_name is not None and not str(raw_name).strip():
+        raise ValueError("name is required")
+    raw_variant = updates.get("variant") if "variant" in updates else None
+    if raw_variant is not None and not str(raw_variant).strip():
+        raise ValueError("variant is required")
+    rec = _STORE.update_domain(
+        domain_id,
+        name=(str(raw_name).strip() if raw_name is not None else None),
+        description=(str(updates.get("description") or "") if "description" in updates else None),
+        emoji=(str(updates.get("emoji") or "") if "emoji" in updates else None),
+        variant=(str(raw_variant).strip() if raw_variant is not None else None),
+        enabled=(bool(updates.get("enabled")) if "enabled" in updates else None),
+    )
+    return _record_to_domain(rec)
 
 
 def delete_domain(domain_id: str) -> bool:
-    with _LOCK:
-        domains = _load_all_domains()
-        next_domains = [d for d in domains if d.get("id") != domain_id]
-        if len(next_domains) == len(domains):
-            return False
-        _save_all_domains(next_domains)
-        return True
+    _ensure_bootstrapped()
+    return _STORE.delete_domain(domain_id)
 
 
 def has_materials_data(materials_root: Path, domain_id: str) -> bool:
@@ -204,18 +180,27 @@ def has_index_data(index_root: Path) -> bool:
 
 
 def domain_ids() -> List[str]:
-    return [d["id"] for d in _load_all_domains() if d.get("enabled", True)]
+    return [d["id"] for d in _list_active_domains()]
 
 
 def get_domain(domain_id: str) -> DomainDict | None:
-    for d in _load_all_domains():
-        if d["id"] == domain_id and d.get("enabled", True):
-            return d
-    return None
+    _ensure_bootstrapped()
+    rec = _STORE.get_domain(domain_id)
+    if rec is None:
+        return None
+    out = _record_to_domain(rec)
+    if not out.get("enabled", True):
+        return None
+    return out
+
+
+def domain_exists(domain_id: str) -> bool:
+    _ensure_bootstrapped()
+    return _STORE.get_domain(domain_id) is not None
 
 
 def domains_response() -> dict[str, Any]:
-    domains = [dict(d) for d in _load_all_domains() if d.get("enabled", True)]
+    domains = _list_active_domains()
     default_domain_id = DEFAULT_DOMAIN_ID
     if not any(d["id"] == default_domain_id for d in domains) and domains:
         default_domain_id = domains[0]["id"]

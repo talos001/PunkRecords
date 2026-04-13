@@ -4,6 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src.api.app import app
+from src.api.domains_data import configure_domain_store
 
 
 @pytest.fixture
@@ -12,6 +13,7 @@ def client(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("PUNKRECORDS_MATERIALS_VAULT", str(tmp_path))
     monkeypatch.setenv("PUNKRECORDS_LLM_PROVIDER", "fake")
+    configure_domain_store(tmp_path / "var" / "domains" / "domains.sqlite3")
     with TestClient(app) as c:
         yield c
 

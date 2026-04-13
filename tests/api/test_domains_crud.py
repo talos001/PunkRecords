@@ -1,6 +1,4 @@
-from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
-import sys
 import sqlite3
 
 import pytest
@@ -8,23 +6,10 @@ import yaml
 from fastapi.testclient import TestClient
 
 from src.api.app import create_app
-import src.api.v1.router as v1_router
-
-def _load_module(module_name: str, relative_path: str):
-    root = Path(__file__).resolve().parents[2]
-    file_path = root / relative_path
-    spec = spec_from_file_location(module_name, file_path)
-    assert spec is not None and spec.loader is not None
-    mod = module_from_spec(spec)
-    sys.modules[module_name] = mod
-    spec.loader.exec_module(mod)
-    return mod
-
-
-_domain_store_mod = _load_module("punkrecords_domain_store", "src/api/domain_store.py")
-_schemas_mod = _load_module("punkrecords_schemas", "src/api/schemas.py")
-DomainStore = _domain_store_mod.DomainStore
-DomainOut = _schemas_mod.DomainOut
+from src.api.auth import AuthStore, JWTService
+from src.api.domain_store import DomainStore
+from src.api.domains_data import configure_domain_store
+from src.api.schemas import DomainOut
 
 
 def test_slug_generation_and_conflict_suffix_persisted(tmp_path: Path) -> None:
@@ -192,15 +177,30 @@ def domains_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     cfg_path.write_text(yaml.safe_dump(cfg, allow_unicode=True), encoding="utf-8")
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("PUNKRECORDS_CONFIG", str(cfg_path))
-    monkeypatch.setattr(v1_router, "require_ready_user", lambda request: None)
+    configure_domain_store(tmp_path / "var" / "domains" / "domains.sqlite3")
     app = create_app()
     with TestClient(app) as client:
-        yield client
+        auth_store: AuthStore = app.state.auth_store
+        jwt_svc: JWTService = app.state.jwt_service
+        user = auth_store.create_user("domains-user", "123456")
+        auth_store.bump_token_version(user.id)
+        refreshed = auth_store.get_user_by_id(user.id)
+        assert refreshed is not None
+        auth_store.update_materials_path(
+            refreshed.id,
+            materials_path=None,
+            confirmed=True,
+        )
+        access_token, _ = jwt_svc.issue_pair(refreshed)
+        headers = {"Authorization": f"Bearer {access_token}"}
+        yield client, headers
 
 
-def test_domains_crud_happy_path(domains_client: TestClient, tmp_path: Path) -> None:
-    created = domains_client.post(
+def test_domains_crud_happy_path(domains_client, tmp_path: Path) -> None:
+    client, headers = domains_client
+    created = client.post(
         "/api/v1/domains",
+        headers=headers,
         json={"name": "Physics", "description": "first"},
     )
     assert created.status_code == 201
@@ -208,23 +208,26 @@ def test_domains_crud_happy_path(domains_client: TestClient, tmp_path: Path) -> 
     assert created_domain["id"] == "physics"
     assert created_domain["name"] == "Physics"
 
-    patched = domains_client.patch(
+    patched = client.patch(
         "/api/v1/domains/physics",
+        headers=headers,
         json={"description": "updated"},
     )
     assert patched.status_code == 200
     assert patched.json()["domain"]["description"] == "updated"
 
-    deleted = domains_client.delete("/api/v1/domains/physics")
+    deleted = client.delete("/api/v1/domains/physics", headers=headers)
     assert deleted.status_code == 200
     assert deleted.json()["ok"] is True
 
 
 def test_delete_domain_returns_409_when_materials_or_index_not_empty(
-    domains_client: TestClient, tmp_path: Path
+    domains_client, tmp_path: Path
 ) -> None:
-    created = domains_client.post(
+    client, headers = domains_client
+    created = client.post(
         "/api/v1/domains",
+        headers=headers,
         json={"name": "Chemistry", "description": "with data"},
     )
     assert created.status_code == 201
@@ -233,7 +236,7 @@ def test_delete_domain_returns_409_when_materials_or_index_not_empty(
     material_file = tmp_path / "materials" / "chemistry" / "incoming" / "a.md"
     material_file.parent.mkdir(parents=True, exist_ok=True)
     material_file.write_text("# note", encoding="utf-8")
-    blocked_by_material = domains_client.delete("/api/v1/domains/chemistry")
+    blocked_by_material = client.delete("/api/v1/domains/chemistry", headers=headers)
     assert blocked_by_material.status_code == 409
     assert blocked_by_material.json()["error"]["code"] == "DOMAIN_NOT_EMPTY"
 
@@ -242,6 +245,16 @@ def test_delete_domain_returns_409_when_materials_or_index_not_empty(
     graph_index = tmp_path / "index" / "chemistry" / ".punkrecords" / "graph_index.json"
     graph_index.parent.mkdir(parents=True, exist_ok=True)
     graph_index.write_text('{"nodes":[{"id":"n1"}]}', encoding="utf-8")
-    blocked_by_index = domains_client.delete("/api/v1/domains/chemistry")
+    blocked_by_index = client.delete("/api/v1/domains/chemistry", headers=headers)
     assert blocked_by_index.status_code == 409
     assert blocked_by_index.json()["error"]["code"] == "DOMAIN_NOT_EMPTY"
+
+
+def test_delete_missing_domain_returns_404_even_if_data_exists(domains_client, tmp_path: Path) -> None:
+    client, headers = domains_client
+    material_file = tmp_path / "materials" / "ghost-domain" / "incoming" / "a.md"
+    material_file.parent.mkdir(parents=True, exist_ok=True)
+    material_file.write_text("# note", encoding="utf-8")
+    resp = client.delete("/api/v1/domains/ghost-domain", headers=headers)
+    assert resp.status_code == 404
+    assert resp.json()["error"]["code"] == "DOMAIN_NOT_FOUND"

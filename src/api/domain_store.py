@@ -149,6 +149,105 @@ class DomainStore:
                         raise
                 raise RuntimeError(f"failed to allocate slug for domain: {base_slug}")
 
+    def seed_domain(
+        self,
+        *,
+        domain_id: str,
+        name: str,
+        description: str = "",
+        emoji: str = "",
+        variant: str = "coral",
+        enabled: bool = True,
+    ) -> DomainRecord:
+        with self._lock:
+            with self._connect() as conn:
+                row = conn.execute("SELECT * FROM domains WHERE id = ?", (domain_id,)).fetchone()
+                existing = self._from_row(row)
+                if existing is not None:
+                    return existing
+                now = _utc_now_iso()
+                conn.execute(
+                    """
+                    INSERT INTO domains (
+                        id, name, description, emoji, variant, enabled,
+                        is_archived, created_at, updated_at, archived_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        domain_id,
+                        name,
+                        description,
+                        emoji,
+                        variant,
+                        1 if enabled else 0,
+                        0 if enabled else 1,
+                        now,
+                        now,
+                        None if enabled else now,
+                    ),
+                )
+                conn.commit()
+                inserted = conn.execute("SELECT * FROM domains WHERE id = ?", (domain_id,)).fetchone()
+            out = self._from_row(inserted)
+            if out is None:
+                raise RuntimeError(f"seeded domain missing after insert: {domain_id}")
+            return out
+
+    def update_domain(
+        self,
+        domain_id: str,
+        *,
+        name: str | None = None,
+        description: str | None = None,
+        emoji: str | None = None,
+        variant: str | None = None,
+        enabled: bool | None = None,
+    ) -> DomainRecord:
+        with self._lock:
+            with self._connect() as conn:
+                row = conn.execute("SELECT * FROM domains WHERE id = ?", (domain_id,)).fetchone()
+                current = self._from_row(row)
+                if current is None:
+                    raise KeyError(f"domain not found: {domain_id}")
+                next_name = current.name if name is None else name
+                next_desc = current.description if description is None else description
+                next_emoji = current.emoji if emoji is None else emoji
+                next_variant = current.variant if variant is None else variant
+                next_enabled = current.enabled if enabled is None else enabled
+                now = _utc_now_iso()
+                conn.execute(
+                    """
+                    UPDATE domains
+                    SET name = ?, description = ?, emoji = ?, variant = ?,
+                        enabled = ?, is_archived = ?, archived_at = ?, updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        next_name,
+                        next_desc,
+                        next_emoji,
+                        next_variant,
+                        1 if next_enabled else 0,
+                        0 if next_enabled else 1,
+                        None if next_enabled else (current.archived_at or now),
+                        now,
+                        domain_id,
+                    ),
+                )
+                conn.commit()
+                updated_row = conn.execute("SELECT * FROM domains WHERE id = ?", (domain_id,)).fetchone()
+            out = self._from_row(updated_row)
+            if out is None:
+                raise KeyError(f"domain not found: {domain_id}")
+            return out
+
+    def delete_domain(self, domain_id: str) -> bool:
+        with self._lock:
+            with self._connect() as conn:
+                cur = conn.execute("DELETE FROM domains WHERE id = ?", (domain_id,))
+                conn.commit()
+                return cur.rowcount > 0
+
     def archive_domain(self, domain_id: str) -> DomainRecord:
         with self._lock:
             with self._connect() as conn:
