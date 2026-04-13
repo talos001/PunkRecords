@@ -121,6 +121,39 @@ def test_create_domain_retries_when_insert_unique_conflict(tmp_path: Path) -> No
     assert created.id == "retry-domain-2"
 
 
+def test_list_domains_invalid_view_raises_value_error(tmp_path: Path) -> None:
+    store = DomainStore(tmp_path / "domains.sqlite3")
+    with pytest.raises(ValueError, match="unknown list view"):
+        store.list_domains(view="invalid")  # type: ignore[arg-type]
+
+
+def test_create_domain_raises_runtime_error_when_retry_exhausted(tmp_path: Path) -> None:
+    db_path = tmp_path / "domains.sqlite3"
+    store = DomainStore(db_path)
+
+    def always_conflict(conn, *, slug, name, description, emoji, variant, now):
+        raise sqlite3.IntegrityError("UNIQUE constraint failed: domains.id")
+
+    store._insert_domain_row = always_conflict
+    with pytest.raises(RuntimeError, match="failed to allocate slug"):
+        store.create_domain(name="Always Conflict", description="x")
+
+
+def test_create_domain_does_not_retry_non_domain_id_integrity_error(tmp_path: Path) -> None:
+    db_path = tmp_path / "domains.sqlite3"
+    store = DomainStore(db_path)
+    attempts = {"count": 0}
+
+    def other_integrity_error(conn, *, slug, name, description, emoji, variant, now):
+        attempts["count"] += 1
+        raise sqlite3.IntegrityError("UNIQUE constraint failed: domains.name")
+
+    store._insert_domain_row = other_integrity_error
+    with pytest.raises(sqlite3.IntegrityError, match="domains.name"):
+        store.create_domain(name="No Retry For Other Error", description="x")
+    assert attempts["count"] == 1
+
+
 def test_domain_schema_supports_archive_contract() -> None:
     out = DomainOut(
         id="physics",
