@@ -37,6 +37,16 @@ def test_domains(client) -> None:
     assert data["default_domain_id"] == "early-childhood"
     ids = {d["id"] for d in data["domains"]}
     assert "chinese" in ids and "history" in ids
+    first = data["domains"][0]
+    assert {"id", "name", "description", "emoji", "variant", "enabled"}.issubset(
+        set(first.keys())
+    )
+
+
+def test_domains_write_requires_ready_user(client) -> None:
+    r = client.post("/api/v1/domains", json={"name": "Physics"})
+    assert r.status_code == 401
+    assert r.json()["error"]["code"] == "AUTH_REQUIRED"
 
 
 def test_chat_text_only(client) -> None:

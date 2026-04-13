@@ -4,7 +4,11 @@ import sys
 import sqlite3
 
 import pytest
+import yaml
+from fastapi.testclient import TestClient
 
+from src.api.app import create_app
+import src.api.v1.router as v1_router
 
 def _load_module(module_name: str, relative_path: str):
     root = Path(__file__).resolve().parents[2]
@@ -168,3 +172,76 @@ def test_domain_schema_supports_archive_contract() -> None:
     data = out.model_dump()
     assert data["is_archived"] is True
     assert data["archived_at"] == "2026-04-13T08:00:00Z"
+
+
+@pytest.fixture
+def domains_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    materials_root = tmp_path / "materials"
+    index_root = tmp_path / "index" / "chemistry"
+    materials_root.mkdir(parents=True, exist_ok=True)
+    index_root.mkdir(parents=True, exist_ok=True)
+    cfg = {
+        "materials_vault_path": str(materials_root),
+        "domain_index_paths": {"chemistry": str(index_root)},
+        "default_agent_backend": "claude_code",
+        "llm_provider": "fake",
+        "llm_model": "x",
+        "llm_timeout_seconds": 60,
+    }
+    cfg_path = tmp_path / "cfg.yaml"
+    cfg_path.write_text(yaml.safe_dump(cfg, allow_unicode=True), encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PUNKRECORDS_CONFIG", str(cfg_path))
+    monkeypatch.setattr(v1_router, "require_ready_user", lambda request: None)
+    app = create_app()
+    with TestClient(app) as client:
+        yield client
+
+
+def test_domains_crud_happy_path(domains_client: TestClient, tmp_path: Path) -> None:
+    created = domains_client.post(
+        "/api/v1/domains",
+        json={"name": "Physics", "description": "first"},
+    )
+    assert created.status_code == 201
+    created_domain = created.json()["domain"]
+    assert created_domain["id"] == "physics"
+    assert created_domain["name"] == "Physics"
+
+    patched = domains_client.patch(
+        "/api/v1/domains/physics",
+        json={"description": "updated"},
+    )
+    assert patched.status_code == 200
+    assert patched.json()["domain"]["description"] == "updated"
+
+    deleted = domains_client.delete("/api/v1/domains/physics")
+    assert deleted.status_code == 200
+    assert deleted.json()["ok"] is True
+
+
+def test_delete_domain_returns_409_when_materials_or_index_not_empty(
+    domains_client: TestClient, tmp_path: Path
+) -> None:
+    created = domains_client.post(
+        "/api/v1/domains",
+        json={"name": "Chemistry", "description": "with data"},
+    )
+    assert created.status_code == 201
+
+    # 材料目录非空：应禁止删除
+    material_file = tmp_path / "materials" / "chemistry" / "incoming" / "a.md"
+    material_file.parent.mkdir(parents=True, exist_ok=True)
+    material_file.write_text("# note", encoding="utf-8")
+    blocked_by_material = domains_client.delete("/api/v1/domains/chemistry")
+    assert blocked_by_material.status_code == 409
+    assert blocked_by_material.json()["error"]["code"] == "DOMAIN_NOT_EMPTY"
+
+    material_file.unlink()
+    # 索引数据非空：应禁止删除
+    graph_index = tmp_path / "index" / "chemistry" / ".punkrecords" / "graph_index.json"
+    graph_index.parent.mkdir(parents=True, exist_ok=True)
+    graph_index.write_text('{"nodes":[{"id":"n1"}]}', encoding="utf-8")
+    blocked_by_index = domains_client.delete("/api/v1/domains/chemistry")
+    assert blocked_by_index.status_code == 409
+    assert blocked_by_index.json()["error"]["code"] == "DOMAIN_NOT_EMPTY"

@@ -7,7 +7,7 @@ from typing import List, Optional
 
 from pathlib import Path
 
-from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Body, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
 from src import __version__ as PKG_VERSION
@@ -18,7 +18,17 @@ from ..agents_registry import AGENTS, DEFAULT_AGENT_ID, get_agent_meta
 from ..chat_materials import ChatAttachmentError
 from ..chat_service import run_chat, run_chat_stream
 from ..deps import require_auth, require_ready_user
-from ..domains_data import DEFAULT_DOMAIN_ID, domain_ids, domains_response, get_domain
+from ..domains_data import (
+    DEFAULT_DOMAIN_ID,
+    create_domain,
+    delete_domain,
+    domain_ids,
+    domains_response,
+    get_domain,
+    has_index_data,
+    has_materials_data,
+    update_domain,
+)
 from ..errors import ApiError
 from ..schemas import (
     AgentOut,
@@ -31,6 +41,7 @@ from ..schemas import (
     BootstrapResponse,
     BootstrapUserOut,
     ChatResponse,
+    DomainCreateBody,
     DomainsResponse,
     IngestBody,
     IngestResponse,
@@ -196,6 +207,47 @@ def version() -> VersionResponse:
 def get_domains() -> DomainsResponse:
     data = domains_response()
     return DomainsResponse(**data)
+
+
+@router.post("/domains", status_code=201)
+def post_domain(request: Request, body: DomainCreateBody) -> dict:
+    require_ready_user(request)
+    try:
+        domain = create_domain(
+            name=body.name,
+            description=body.description,
+            emoji=body.emoji,
+            variant=body.variant,
+        )
+    except ValueError as e:
+        raise ApiError(400, "INVALID_DOMAIN", str(e)) from e
+    return {"domain": domain}
+
+
+@router.patch("/domains/{domain_id}")
+def patch_domain(request: Request, domain_id: str, body: dict = Body(...)) -> dict:
+    require_ready_user(request)
+    if not isinstance(body, dict):
+        raise ApiError(400, "INVALID_DOMAIN", "请求体必须是对象")
+    updated = update_domain(domain_id, body)
+    if updated is None:
+        raise ApiError(404, "DOMAIN_NOT_FOUND", "领域不存在")
+    return {"domain": updated}
+
+
+@router.delete("/domains/{domain_id}")
+def remove_domain(request: Request, domain_id: str) -> dict:
+    require_ready_user(request)
+    cfg = request.app.state.config
+    if has_materials_data(cfg.materials_vault_path, domain_id):
+        raise ApiError(409, "DOMAIN_NOT_EMPTY", "该领域已有材料或索引数据，无法删除")
+    index_root = cfg.domain_index_paths.get(domain_id)
+    if index_root and has_index_data(index_root):
+        raise ApiError(409, "DOMAIN_NOT_EMPTY", "该领域已有材料或索引数据，无法删除")
+    deleted = delete_domain(domain_id)
+    if not deleted:
+        raise ApiError(404, "DOMAIN_NOT_FOUND", "领域不存在")
+    return {"ok": True}
 
 
 @router.post("/chat", response_model=ChatResponse)
