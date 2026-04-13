@@ -7,7 +7,7 @@ from typing import List, Optional
 
 from pathlib import Path
 
-from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Body, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
 from src import __version__ as PKG_VERSION
@@ -18,7 +18,18 @@ from ..agents_registry import AGENTS, DEFAULT_AGENT_ID, get_agent_meta
 from ..chat_materials import ChatAttachmentError
 from ..chat_service import run_chat, run_chat_stream
 from ..deps import require_auth, require_ready_user
-from ..domains_data import DEFAULT_DOMAIN_ID, domain_ids, domains_response, get_domain
+from ..domains_data import (
+    DEFAULT_DOMAIN_ID,
+    active_domain_count,
+    archive_domain,
+    create_domain,
+    domain_exists,
+    domains_response,
+    get_domain,
+    has_index_data,
+    has_materials_data,
+    update_domain,
+)
 from ..errors import ApiError
 from ..schemas import (
     AgentOut,
@@ -31,6 +42,7 @@ from ..schemas import (
     BootstrapResponse,
     BootstrapUserOut,
     ChatResponse,
+    DomainCreateBody,
     DomainsResponse,
     IngestBody,
     IngestResponse,
@@ -76,6 +88,13 @@ def _ensure_writable_dir(path_raw: str) -> None:
     probe = p / ".punkrecords-write-probe"
     probe.write_text("ok", encoding="utf-8")
     probe.unlink(missing_ok=True)
+
+
+def _require_active_domain(domain_id: str) -> dict:
+    dom = get_domain(domain_id)
+    if dom is None:
+        raise HTTPException(status_code=400, detail="domain 不存在或已归档")
+    return dom
 
 
 @router.post("/auth/register", response_model=AuthTokenResponse)
@@ -198,6 +217,55 @@ def get_domains() -> DomainsResponse:
     return DomainsResponse(**data)
 
 
+@router.post("/domains", status_code=201)
+def post_domain(request: Request, body: DomainCreateBody) -> dict:
+    require_ready_user(request)
+    try:
+        domain = create_domain(
+            name=body.name,
+            description=body.description,
+            emoji=body.emoji,
+            variant=body.variant,
+        )
+    except ValueError as e:
+        raise ApiError(400, "INVALID_DOMAIN", str(e)) from e
+    return {"domain": domain}
+
+
+@router.patch("/domains/{domain_id}")
+def patch_domain(request: Request, domain_id: str, body: dict = Body(...)) -> dict:
+    require_ready_user(request)
+    if not isinstance(body, dict):
+        raise ApiError(400, "INVALID_DOMAIN", "请求体必须是对象")
+    try:
+        updated = update_domain(domain_id, body)
+    except ValueError as e:
+        raise ApiError(400, "INVALID_DOMAIN", str(e)) from e
+    if updated is None:
+        raise ApiError(404, "DOMAIN_NOT_FOUND", "领域不存在")
+    return {"domain": updated}
+
+
+@router.delete("/domains/{domain_id}")
+def remove_domain(request: Request, domain_id: str) -> dict:
+    require_ready_user(request)
+    cfg = request.app.state.config
+    if not domain_exists(domain_id):
+        raise ApiError(404, "DOMAIN_NOT_FOUND", "领域不存在")
+    if has_materials_data(cfg.materials_vault_path, domain_id):
+        raise ApiError(409, "DOMAIN_NOT_EMPTY", "该领域已有材料或索引数据，无法删除")
+    index_root = cfg.domain_index_paths.get(domain_id)
+    if index_root and has_index_data(index_root):
+        raise ApiError(409, "DOMAIN_NOT_EMPTY", "该领域已有材料或索引数据，无法删除")
+    target = get_domain(domain_id)
+    if target is not None and active_domain_count() <= 1:
+        raise ApiError(409, "DOMAIN_LAST_ACTIVE", "至少保留一个活跃领域")
+    archived = archive_domain(domain_id)
+    if archived is None:
+        raise ApiError(404, "DOMAIN_NOT_FOUND", "领域不存在")
+    return {"ok": True, "domain": archived}
+
+
 @router.post("/chat", response_model=ChatResponse)
 async def chat(
     request: Request,
@@ -207,14 +275,7 @@ async def chat(
     files: Optional[List[UploadFile]] = File(None),
 ) -> ChatResponse:
     require_ready_user(request)
-    if domain_id not in domain_ids():
-        raise HTTPException(
-            status_code=400,
-            detail="未知 domain_id",
-        )
-
-    dom = get_domain(domain_id)
-    assert dom is not None
+    dom = _require_active_domain(domain_id)
     domain_name = dom["name"]
 
     effective_agent = agent_id or get_current_agent_id()
@@ -265,11 +326,7 @@ async def chat_stream(
     files: Optional[List[UploadFile]] = File(None),
 ) -> StreamingResponse:
     require_ready_user(request)
-    if domain_id not in domain_ids():
-        raise HTTPException(status_code=400, detail="未知 domain_id")
-
-    dom = get_domain(domain_id)
-    assert dom is not None
+    dom = _require_active_domain(domain_id)
     domain_name = dom["name"]
 
     effective_agent = agent_id or get_current_agent_id()
@@ -376,8 +433,7 @@ def get_settings(request: Request) -> SettingsResponse:
 def post_ingest(request: Request, body: IngestBody) -> IngestResponse:
     """将材料 Vault 内单个文件摄取到指定领域的索引 Vault（与 CLI ``ingest`` 等价）。"""
     require_ready_user(request)
-    if body.domain_id not in domain_ids():
-        raise HTTPException(status_code=400, detail="未知 domain_id")
+    _require_active_domain(body.domain_id)
     cfg = request.app.state.config
     try:
         result = ingest_material_file(

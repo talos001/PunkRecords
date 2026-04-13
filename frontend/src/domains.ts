@@ -14,6 +14,7 @@ export type Domain = {
   /** 卡片装饰用，避免下拉列表式的单调感 */
   emoji: string;
   variant: DomainVariant;
+  status: "active" | "archived";
 };
 
 export const DOMAINS: Domain[] = [
@@ -23,6 +24,7 @@ export const DOMAINS: Domain[] = [
     description: "育儿、早教与儿童发展相关",
     emoji: "🌱",
     variant: "coral",
+    status: "active",
   },
   {
     id: "math",
@@ -30,6 +32,7 @@ export const DOMAINS: Domain[] = [
     description: "数学概念、习题与拓展",
     emoji: "🔢",
     variant: "indigo",
+    status: "active",
   },
   {
     id: "english",
@@ -37,6 +40,7 @@ export const DOMAINS: Domain[] = [
     description: "英语学习与阅读材料",
     emoji: "✨",
     variant: "mint",
+    status: "active",
   },
   {
     id: "chinese",
@@ -44,6 +48,7 @@ export const DOMAINS: Domain[] = [
     description: "阅读、写作与语言文字积累",
     emoji: "📖",
     variant: "amber",
+    status: "active",
   },
   {
     id: "history",
@@ -51,6 +56,7 @@ export const DOMAINS: Domain[] = [
     description: "历史事件、人物与脉络梳理",
     emoji: "🏛️",
     variant: "rose",
+    status: "active",
   },
 ];
 
@@ -61,11 +67,15 @@ const STORAGE_KEY = "punkrecords_selected_domain";
 /** 旧版「通用」已移除，迁移到默认领域 */
 const LEGACY_GENERAL_ID = "general";
 
+export function filterActiveDomains(domains: Domain[]): Domain[] {
+  return domains.filter((d) => d.status === "active");
+}
+
 export function loadSavedDomainId(): string {
   try {
     const v = localStorage.getItem(STORAGE_KEY);
     if (v === LEGACY_GENERAL_ID) return DEFAULT_DOMAIN_ID;
-    if (v && DOMAINS.some((d) => d.id === v)) return v;
+    if (v) return v;
   } catch {
     /* ignore */
   }

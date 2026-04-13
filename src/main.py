@@ -30,7 +30,12 @@ def cli(ctx, config):
 
 
 @cli.command()
-@click.option("--domain", "-d", required=True, help="领域 id（须与 domain_index_paths 键一致）")
+@click.option(
+    "--domain",
+    "-d",
+    required=True,
+    help="领域 id（显式 domain_index_paths 优先，未命中走默认 fallback 索引目录）",
+)
 @click.option(
     "--agent",
     "-a",

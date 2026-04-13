@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+import os
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +14,7 @@ from src.config import load_app_config
 from src.llm.registry import LLMRegistry
 
 from .auth import AuthStore, JWTService, get_auth_secret
+from .domains_data import configure_domain_store
 from .errors import ApiError
 from .v1.router import router as v1_router
 
@@ -22,10 +24,14 @@ API_PREFIX = "/api/v1"
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     cfg = load_app_config()
+    cfg_path_raw = os.environ.get("PUNKRECORDS_CONFIG")
+    cfg_path = Path(cfg_path_raw).expanduser() if cfg_path_raw else None
+    data_root = cfg_path.parent if cfg_path and cfg_path.is_file() else Path.cwd()
+    configure_domain_store(data_root / "var" / "domains" / "domains.sqlite3")
     cfg.materials_vault_path.mkdir(parents=True, exist_ok=True)
     app.state.config = cfg
     app.state.llm_registry = LLMRegistry(cfg)
-    app.state.auth_store = AuthStore((Path.cwd() / "var" / "auth" / "users.db"))
+    app.state.auth_store = AuthStore((data_root / "var" / "auth" / "users.db"))
     app.state.jwt_service = JWTService(get_auth_secret())
     yield
 

@@ -30,7 +30,7 @@ class Config:
     llm_model: str = "claude-sonnet-4-20250514"
     llm_timeout_seconds: float = 120.0
     chat_auto_ingest: bool = False
-    """``POST /chat`` 在附件落盘后是否自动对新材料执行摄取（需配置 ``domain_index_paths``）。"""
+    """``POST /chat`` 在附件落盘后是否自动摄取（索引路径为显式映射优先，未命中走 fallback）。"""
 
 
 def _llm_provider_from_yaml(data: dict) -> str:

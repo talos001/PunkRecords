@@ -19,7 +19,7 @@
 | 项 | 说明 |
 |----|------|
 | `materials_vault_path` | 材料根目录（会创建子目录 `/{domain}/incoming/...`） |
-| `domain_index_paths` | 各 `domain_id` → 索引 Vault 根目录（**联调 ingest / chat_auto_ingest 必填**） |
+| `domain_index_paths` | 各 `domain_id` → 索引 Vault 根目录（显式映射优先；未命中走默认 fallback 目录） |
 | `llm_*` | 模型与密钥 |
 | `chat_auto_ingest` | 若需「发附件聊天后自动写索引」设为 `true` |
 
@@ -134,7 +134,7 @@ curl -s -X POST http://127.0.0.1:8765/api/v1/auth/reset-password \
 | 现象 | 排查 |
 |------|------|
 | 仍走 fake / 无真实回复 | 是否加载到含 `llm_provider: anthropic` 的 YAML；或环境变量仍强制 `PUNKRECORDS_LLM_PROVIDER=fake` |
-| `POST /ingest` 400「缺少 domain_index_paths」 | 配置中为该 `domain_id` 配置索引路径 |
+| `POST /ingest` 400「domain 不存在或已归档」 | 仅 active domain 可摄取；先检查 `GET /api/v1/domains` 与领域状态 |
 | 自动摄取无效果 | `chat_auto_ingest: true` 且本次请求**有附件**；查看后端日志是否有 `聊天后自动摄取失败` |
 | 前端跨域错误 | 核对 `VITE_API_BASE_URL` 与后端 host/port、CORS 列表 |
 
