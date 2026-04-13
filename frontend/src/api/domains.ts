@@ -52,6 +52,14 @@ export type DomainDeleteApiResponse = {
   ok: boolean;
 };
 
+const DOMAIN_VARIANTS: DomainVariant[] = [
+  "coral",
+  "indigo",
+  "mint",
+  "amber",
+  "rose",
+];
+
 async function parseJson<T>(res: Response): Promise<T> {
   const data = (await res.json().catch(() => ({}))) as T | ErrorBody;
   if (!res.ok) {
@@ -66,6 +74,13 @@ async function parseJson<T>(res: Response): Promise<T> {
   return data as T;
 }
 
+function toDomainVariant(v?: string): DomainVariant {
+  if (v && DOMAIN_VARIANTS.includes(v as DomainVariant)) {
+    return v as DomainVariant;
+  }
+  return "coral";
+}
+
 function toLocalDomain(d: DomainApiItem): Domain {
   const isArchived = d.is_archived ?? d.enabled === false;
   return {
@@ -73,7 +88,7 @@ function toLocalDomain(d: DomainApiItem): Domain {
     name: d.name,
     description: d.description,
     emoji: d.emoji ?? "📁",
-    variant: (d.variant as DomainVariant) ?? "coral",
+    variant: toDomainVariant(d.variant),
     status: isArchived ? "archived" : "active",
   };
 }

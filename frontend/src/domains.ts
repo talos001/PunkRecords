@@ -75,7 +75,7 @@ export function loadSavedDomainId(): string {
   try {
     const v = localStorage.getItem(STORAGE_KEY);
     if (v === LEGACY_GENERAL_ID) return DEFAULT_DOMAIN_ID;
-    if (v && DOMAINS.some((d) => d.id === v)) return v;
+    if (v) return v;
   } catch {
     /* ignore */
   }
