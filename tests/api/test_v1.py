@@ -92,6 +92,23 @@ def test_chat_bad_domain(client, ready_auth_headers) -> None:
     assert "error" in r.json()
 
 
+def test_chat_rejects_archived_domain(client, ready_auth_headers) -> None:
+    archive = client.patch(
+        "/api/v1/domains/math",
+        headers=ready_auth_headers,
+        json={"enabled": False},
+    )
+    assert archive.status_code == 200
+    assert archive.json()["domain"]["enabled"] is False
+    r = client.post(
+        "/api/v1/chat",
+        headers=ready_auth_headers,
+        data={"domain_id": "math", "text": "x"},
+    )
+    assert r.status_code == 400
+    assert "error" in r.json()
+
+
 def test_chat_stream_sse(client, ready_auth_headers) -> None:
     with client.stream(
         "POST",

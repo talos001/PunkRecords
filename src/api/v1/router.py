@@ -23,7 +23,6 @@ from ..domains_data import (
     create_domain,
     delete_domain,
     domain_exists,
-    domain_ids,
     domains_response,
     get_domain,
     has_index_data,
@@ -88,6 +87,13 @@ def _ensure_writable_dir(path_raw: str) -> None:
     probe = p / ".punkrecords-write-probe"
     probe.write_text("ok", encoding="utf-8")
     probe.unlink(missing_ok=True)
+
+
+def _require_active_domain(domain_id: str) -> dict:
+    dom = get_domain(domain_id)
+    if dom is None:
+        raise HTTPException(status_code=400, detail="domain 不存在或已归档")
+    return dom
 
 
 @router.post("/auth/register", response_model=AuthTokenResponse)
@@ -265,14 +271,7 @@ async def chat(
     files: Optional[List[UploadFile]] = File(None),
 ) -> ChatResponse:
     require_ready_user(request)
-    if domain_id not in domain_ids():
-        raise HTTPException(
-            status_code=400,
-            detail="未知 domain_id",
-        )
-
-    dom = get_domain(domain_id)
-    assert dom is not None
+    dom = _require_active_domain(domain_id)
     domain_name = dom["name"]
 
     effective_agent = agent_id or get_current_agent_id()
@@ -323,11 +322,7 @@ async def chat_stream(
     files: Optional[List[UploadFile]] = File(None),
 ) -> StreamingResponse:
     require_ready_user(request)
-    if domain_id not in domain_ids():
-        raise HTTPException(status_code=400, detail="未知 domain_id")
-
-    dom = get_domain(domain_id)
-    assert dom is not None
+    dom = _require_active_domain(domain_id)
     domain_name = dom["name"]
 
     effective_agent = agent_id or get_current_agent_id()
@@ -434,8 +429,7 @@ def get_settings(request: Request) -> SettingsResponse:
 def post_ingest(request: Request, body: IngestBody) -> IngestResponse:
     """将材料 Vault 内单个文件摄取到指定领域的索引 Vault（与 CLI ``ingest`` 等价）。"""
     require_ready_user(request)
-    if body.domain_id not in domain_ids():
-        raise HTTPException(status_code=400, detail="未知 domain_id")
+    _require_active_domain(body.domain_id)
     cfg = request.app.state.config
     try:
         result = ingest_material_file(

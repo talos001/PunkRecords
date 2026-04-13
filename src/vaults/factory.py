@@ -10,13 +10,16 @@ from .index_vault import IndexVault
 
 
 def resolve_index_vault_path(config: Config, domain_id: str) -> Path:
-    """返回领域索引 Vault 根目录（已 expanduser/resolve）；未配置则抛 ``ValueError``。"""
+    """返回领域索引 Vault 根目录（已 expanduser/resolve）。
+
+    优先使用 ``domain_index_paths[domain_id]``；若该领域未显式配置，则回退到
+    ``<materials_vault_path 的父目录>/index_vaults/<domain_id>``。
+    """
     raw = config.domain_index_paths.get(domain_id)
-    if raw is None:
-        raise ValueError(
-            f"配置中缺少 domain_index_paths['{domain_id}']，无法写入该领域的索引 Vault"
-        )
-    return Path(raw).expanduser().resolve()
+    if raw is not None:
+        return Path(raw).expanduser().resolve()
+    fallback_root = config.materials_vault_path.expanduser().resolve().parent / "index_vaults"
+    return (fallback_root / domain_id).resolve()
 
 
 def open_index_vault(config: Config, domain_id: str) -> IndexVault:
