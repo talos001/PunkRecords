@@ -43,7 +43,7 @@ type ChatMessage = {
 };
 
 type AuthState = "anonymous" | "authenticated_unconfigured" | "authenticated_ready";
-type PendingAction = "send" | "settings" | "domain";
+type PendingAction = "send" | "settings";
 
 function uid(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -413,6 +413,11 @@ export function App() {
     }
     setPendingAction(null);
   }, [pendingAction]);
+
+  useEffect(() => {
+    if (authState !== "authenticated_ready" || !pendingAction) return;
+    runPendingAction();
+  }, [authState, pendingAction, runPendingAction]);
 
   const currentDomain = useMemo(
     () => domainsList.find((d) => d.id === domainId) ?? domainsList[0],
