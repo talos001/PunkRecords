@@ -145,7 +145,7 @@
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| `domain_id` | string | 是 | 与 `domain_index_paths` 键一致 |
+| `domain_id` | string | 是 | active domain；索引路径优先使用 `domain_index_paths[domain_id]`，缺省走默认 fallback 目录策略 |
 | `relative_path` | string | 是 | 相对材料 Vault 根的路径（POSIX） |
 | `agent_id` | string | 否 | 覆盖 `default_agent_backend`，作为摄取后端 |
 
@@ -160,7 +160,7 @@
 }
 ```
 
-**说明**：`POST /chat` 上传附件后，若服务端配置 `chat_auto_ingest: true`，可在对话完成后自动对新材料执行摄取（需已配置 `domain_index_paths` 且失败时仅记录日志，不阻断回复）。
+**说明**：`POST /chat` 上传附件后，若服务端配置 `chat_auto_ingest: true`，可在对话完成后自动对新材料执行摄取（索引路径优先用 `domain_index_paths` 显式映射，缺省走 fallback 目录；失败时仅记录日志，不阻断回复）。
 
 ---
 
@@ -238,3 +238,4 @@
 | 2026-04-12 | 已实现 P0：`GET /health`、`GET /version`、`GET /domains`、`POST /chat`、`GET /agents`、`GET|PUT /settings/agent`、`GET /settings`（见 `src/api/`） |
 | 2026-04-12 | 已实现：`POST /chat/stream`（SSE）、`POST /ingest`、配置项 `chat_auto_ingest` |
 | 2026-04-13 | 新增 `POST /auth/reset-password`，用于本地开发场景下按用户名重置密码 |
+| 2026-04-13 | 更新 ingest 文档契约：`domain_index_paths` 显式映射优先，未命中时走默认 fallback 索引目录 |

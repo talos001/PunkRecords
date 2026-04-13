@@ -10,7 +10,7 @@
 
 1. **先定「盘上长什么样」**，再让代码与 API 服从布局与配置。
 2. **单一入口读写材料根**：业务层通过同一抽象（`MaterialVault` 或薄封装）访问 `materials_vault_path`，避免一半裸 `Path`、一半类方法。
-3. **索引与材料分离**：`domain_id` → `IndexVault` 路径由 `domain_index_paths` 显式配置，写入前约定 JSON 形态与引用规则。
+3. **索引与材料分离**：`domain_id` → `IndexVault` 路径优先使用 `domain_index_paths` 显式配置；未命中时按默认 fallback 根目录策略解析，写入前约定 JSON 形态与引用规则。
 4. **API 是最后一层**：在 1、2 的契约稳定后，再把 `POST /chat` 扩展为触发 ingest、或增加 CLI/任务接口。
 
 ---
