@@ -133,7 +133,8 @@ class DomainStore:
                 conn.execute(
                     """
                     UPDATE domains
-                    SET enabled = 0, is_archived = 1, archived_at = ?, updated_at = ?
+                    SET enabled = 0, is_archived = 1,
+                        archived_at = COALESCE(archived_at, ?), updated_at = ?
                     WHERE id = ?
                     """,
                     (now, now, domain_id),

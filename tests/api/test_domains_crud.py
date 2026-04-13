@@ -1,7 +1,23 @@
+from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
+import sys
 
-from src.api.domain_store import DomainStore
-from src.api.schemas import DomainOut
+
+def _load_module(module_name: str, relative_path: str):
+    root = Path(__file__).resolve().parents[2]
+    file_path = root / relative_path
+    spec = spec_from_file_location(module_name, file_path)
+    assert spec is not None and spec.loader is not None
+    mod = module_from_spec(spec)
+    sys.modules[module_name] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+_domain_store_mod = _load_module("punkrecords_domain_store", "src/api/domain_store.py")
+_schemas_mod = _load_module("punkrecords_schemas", "src/api/schemas.py")
+DomainStore = _domain_store_mod.DomainStore
+DomainOut = _schemas_mod.DomainOut
 
 
 def test_slug_generation_and_conflict_suffix_persisted(tmp_path: Path) -> None:
@@ -54,6 +70,17 @@ def test_list_domains_include_archived_switches_view(tmp_path: Path) -> None:
     assert archived.id not in active_ids
     assert archived.id in archived_ids
     assert active.id not in archived_ids
+
+
+def test_archive_should_keep_first_archived_at(tmp_path: Path) -> None:
+    db_path = tmp_path / "domains.sqlite3"
+    store = DomainStore(db_path)
+    created = store.create_domain(name="Repeat Archive", description="R")
+    first = store.archive_domain(created.id)
+    second = store.archive_domain(created.id)
+
+    assert first.archived_at is not None
+    assert second.archived_at == first.archived_at
 
 
 def test_domain_schema_supports_archive_contract() -> None:
