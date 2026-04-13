@@ -1,7 +1,5 @@
 from pathlib import Path
 
-import pytest
-
 from src.config import Config
 from src.vaults.factory import open_index_vault, resolve_index_vault_path
 
@@ -15,8 +13,8 @@ def test_resolve_index_vault_path_missing(tmp_path: Path) -> None:
         llm_model="x",
         llm_timeout_seconds=60.0,
     )
-    with pytest.raises(ValueError, match="domain_index_paths"):
-        resolve_index_vault_path(cfg, "x")
+    resolved = resolve_index_vault_path(cfg, "x")
+    assert resolved == (tmp_path / "index_vaults" / "x").resolve()
 
 
 def test_open_index_vault_creates_state(tmp_path: Path) -> None:

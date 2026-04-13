@@ -85,3 +85,20 @@ def test_post_ingest_fallback_to_default_index_root_when_domain_not_configured(
         tmp_path / "index_vaults" / "early-childhood" / ".punkrecords" / "graph_index.json"
     )
     assert fallback_graph.exists()
+
+
+def test_post_ingest_rejects_archived_domain(client_ingest) -> None:
+    client, _, headers = client_ingest
+    archive = client.patch(
+        "/api/v1/domains/math",
+        headers=headers,
+        json={"enabled": False},
+    )
+    assert archive.status_code == 200
+    r = client.post(
+        "/api/v1/ingest",
+        headers=headers,
+        json={"domain_id": "math", "relative_path": "n.md"},
+    )
+    assert r.status_code == 400
+    assert "error" in r.json()
