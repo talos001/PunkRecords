@@ -38,6 +38,7 @@ export type DomainUpdateRequest = {
   emoji?: string;
   variant?: DomainVariant;
   enabled?: boolean;
+  status?: "active" | "archived";
 };
 
 export type DomainCreateApiResponse = {
@@ -120,13 +121,19 @@ export async function updateDomain(params: {
   domainId: string;
   body: DomainUpdateRequest;
 }): Promise<DomainUpdateApiResponse> {
+  const requestBody: DomainUpdateRequest = { ...params.body };
+  // UI 侧统一使用 status 语义，后端若仅识别 enabled 则在此兼容映射。
+  if (requestBody.status) {
+    requestBody.enabled = requestBody.status === "active";
+    delete requestBody.status;
+  }
   const r = await fetch(`${params.baseUrl}/api/v1/domains/${params.domainId}`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${params.accessToken}`,
     },
-    body: JSON.stringify(params.body),
+    body: JSON.stringify(requestBody),
   });
   return parseJson<DomainUpdateApiResponse>(r);
 }

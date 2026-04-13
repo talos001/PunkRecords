@@ -859,19 +859,18 @@ export function App() {
                         emoji: newDomainEmoji.trim() || "📁",
                       },
                     })
-                      .then((res) => refreshDomains(res.domain.id))
-                      .then((domains) => {
-                        const created = domains.find(
-                          (d) =>
-                            d.name === newDomainName.trim() &&
-                            d.description === newDomainDescription.trim(),
-                        );
+                      .then(async (res) => {
+                        const createdId = res.domain.id;
+                        const domains = await refreshDomains(createdId);
+                        const created = domains.find((d) => d.id === createdId);
                         if (created) {
                           setEditingDomainId(created.id);
                           setEditingDomainName(created.name);
                           setEditingDomainDescription(created.description);
                           setEditingDomainEmoji(created.emoji || "📁");
                         }
+                      })
+                      .then(() => {
                         setNewDomainName("");
                         setNewDomainDescription("");
                         setNewDomainEmoji("📁");
@@ -1038,7 +1037,7 @@ export function App() {
                                   baseUrl: API_BASE_URL,
                                   accessToken,
                                   domainId: editingDomainId,
-                                  body: { enabled: false },
+                                  body: { status: "archived" },
                                 });
                                 await refreshDomains();
                                 setDomainSuccess(
