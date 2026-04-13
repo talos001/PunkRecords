@@ -20,11 +20,24 @@ class DomainOut(BaseModel):
     emoji: str = ""
     variant: str = "coral"
     enabled: bool = True
+    is_archived: bool = False
+    archived_at: Optional[str] = None
 
 
 class DomainsResponse(BaseModel):
     domains: List[DomainOut]
     default_domain_id: str
+
+
+class DomainCreateBody(BaseModel):
+    name: str
+    description: str = ""
+    emoji: str = ""
+    variant: str = "coral"
+
+
+class DomainArchiveResponse(BaseModel):
+    domain: DomainOut
 
 
 class ChatMessageOut(BaseModel):
