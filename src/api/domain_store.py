@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from threading import Lock
+from typing import Literal
 
 
 def _utc_now_iso() -> str:
@@ -79,14 +80,37 @@ class DomainStore:
             archived_at=row["archived_at"],
         )
 
-    def _next_available_slug(self, conn: sqlite3.Connection, base_slug: str) -> str:
-        idx = 1
-        while True:
-            candidate = base_slug if idx == 1 else f"{base_slug}-{idx}"
-            row = conn.execute("SELECT 1 FROM domains WHERE id = ?", (candidate,)).fetchone()
-            if row is None:
-                return candidate
-            idx += 1
+    def _insert_domain_row(
+        self,
+        conn: sqlite3.Connection,
+        *,
+        slug: str,
+        name: str,
+        description: str,
+        emoji: str,
+        variant: str,
+        now: str,
+    ) -> None:
+        conn.execute(
+            """
+            INSERT INTO domains (
+                id, name, description, emoji, variant, enabled,
+                is_archived, created_at, updated_at, archived_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                slug,
+                name,
+                description,
+                emoji,
+                variant,
+                1,
+                0,
+                now,
+                now,
+                None,
+            ),
+        )
 
     def create_domain(
         self,
@@ -98,33 +122,32 @@ class DomainStore:
     ) -> DomainRecord:
         with self._lock:
             with self._connect() as conn:
-                now = _utc_now_iso()
-                slug = self._next_available_slug(conn, _slugify(name))
-                conn.execute(
-                    """
-                    INSERT INTO domains (
-                        id, name, description, emoji, variant, enabled,
-                        is_archived, created_at, updated_at, archived_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        slug,
-                        name,
-                        description,
-                        emoji,
-                        variant,
-                        1,
-                        0,
-                        now,
-                        now,
-                        None,
-                    ),
-                )
-                conn.commit()
-                row = conn.execute("SELECT * FROM domains WHERE id = ?", (slug,)).fetchone()
-            out = self._from_row(row)
-            assert out is not None
-            return out
+                base_slug = _slugify(name)
+                max_retry = 64
+                for idx in range(1, max_retry + 1):
+                    slug = base_slug if idx == 1 else f"{base_slug}-{idx}"
+                    now = _utc_now_iso()
+                    try:
+                        self._insert_domain_row(
+                            conn,
+                            slug=slug,
+                            name=name,
+                            description=description,
+                            emoji=emoji,
+                            variant=variant,
+                            now=now,
+                        )
+                        conn.commit()
+                        row = conn.execute("SELECT * FROM domains WHERE id = ?", (slug,)).fetchone()
+                        out = self._from_row(row)
+                        if out is None:
+                            raise RuntimeError(f"created domain missing after insert: {slug}")
+                        return out
+                    except sqlite3.IntegrityError as e:
+                        if "domains.id" in str(e):
+                            continue
+                        raise
+                raise RuntimeError(f"failed to allocate slug for domain: {base_slug}")
 
     def archive_domain(self, domain_id: str) -> DomainRecord:
         with self._lock:
@@ -152,17 +175,23 @@ class DomainStore:
                 row = conn.execute("SELECT * FROM domains WHERE id = ?", (domain_id,)).fetchone()
             return self._from_row(row)
 
-    def list_domains(self, *, include_archived: bool = False) -> list[DomainRecord]:
+    def list_domains(
+        self, *, view: Literal["active", "archived", "all"] = "active"
+    ) -> list[DomainRecord]:
         with self._lock:
             with self._connect() as conn:
-                if include_archived:
+                if view == "archived":
                     rows = conn.execute(
                         "SELECT * FROM domains WHERE is_archived = 1 ORDER BY created_at ASC"
                     ).fetchall()
-                else:
+                elif view == "active":
                     rows = conn.execute(
                         "SELECT * FROM domains WHERE is_archived = 0 ORDER BY created_at ASC"
                     ).fetchall()
+                elif view == "all":
+                    rows = conn.execute("SELECT * FROM domains ORDER BY created_at ASC").fetchall()
+                else:
+                    raise ValueError(f"unknown list view: {view}")
         out: list[DomainRecord] = []
         for row in rows:
             rec = self._from_row(row)

@@ -1,6 +1,9 @@
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 import sys
+import sqlite3
+
+import pytest
 
 
 def _load_module(module_name: str, relative_path: str):
@@ -31,7 +34,7 @@ def test_slug_generation_and_conflict_suffix_persisted(tmp_path: Path) -> None:
     assert d2.id == "math-basics-2"
 
     reloaded = DomainStore(db_path)
-    ids = [d.id for d in reloaded.list_domains()]
+    ids = [d.id for d in reloaded.list_domains(view="active")]
     assert ids == ["math-basics", "math-basics-2"]
 
 
@@ -45,10 +48,10 @@ def test_archive_keeps_domain_readable(tmp_path: Path) -> None:
     assert archived.enabled is False
     assert archived.archived_at is not None
 
-    active_ids = [d.id for d in store.list_domains()]
+    active_ids = [d.id for d in store.list_domains(view="active")]
     assert created.id not in active_ids
 
-    all_ids = [d.id for d in store.list_domains(include_archived=True)]
+    all_ids = [d.id for d in store.list_domains(view="archived")]
     assert created.id in all_ids
 
     fetched = store.get_domain(created.id)
@@ -56,20 +59,23 @@ def test_archive_keeps_domain_readable(tmp_path: Path) -> None:
     assert fetched.is_archived is True
 
 
-def test_list_domains_include_archived_switches_view(tmp_path: Path) -> None:
+def test_list_domains_view_semantics_active_archived_all(tmp_path: Path) -> None:
     db_path = tmp_path / "domains.sqlite3"
     store = DomainStore(db_path)
     active = store.create_domain(name="Active Domain", description="A")
     archived = store.create_domain(name="Archived Domain", description="B")
     store.archive_domain(archived.id)
 
-    active_ids = [d.id for d in store.list_domains(include_archived=False)]
-    archived_ids = [d.id for d in store.list_domains(include_archived=True)]
+    active_ids = [d.id for d in store.list_domains(view="active")]
+    archived_ids = [d.id for d in store.list_domains(view="archived")]
+    all_ids = [d.id for d in store.list_domains(view="all")]
 
     assert active.id in active_ids
     assert archived.id not in active_ids
     assert archived.id in archived_ids
     assert active.id not in archived_ids
+    assert active.id in all_ids
+    assert archived.id in all_ids
 
 
 def test_archive_should_keep_first_archived_at(tmp_path: Path) -> None:
@@ -81,6 +87,38 @@ def test_archive_should_keep_first_archived_at(tmp_path: Path) -> None:
 
     assert first.archived_at is not None
     assert second.archived_at == first.archived_at
+
+
+def test_archive_missing_domain_raises_key_error(tmp_path: Path) -> None:
+    store = DomainStore(tmp_path / "domains.sqlite3")
+    with pytest.raises(KeyError):
+        store.archive_domain("missing-domain")
+
+
+def test_create_domain_retries_when_insert_unique_conflict(tmp_path: Path) -> None:
+    db_path = tmp_path / "domains.sqlite3"
+    store = DomainStore(db_path)
+
+    original_insert = store._insert_domain_row
+    state = {"called": False}
+
+    def flaky_insert(conn, *, slug, name, description, emoji, variant, now):
+        if not state["called"]:
+            state["called"] = True
+            raise sqlite3.IntegrityError("UNIQUE constraint failed: domains.id")
+        return original_insert(
+            conn,
+            slug=slug,
+            name=name,
+            description=description,
+            emoji=emoji,
+            variant=variant,
+            now=now,
+        )
+
+    store._insert_domain_row = flaky_insert
+    created = store.create_domain(name="Retry Domain", description="r")
+    assert created.id == "retry-domain-2"
 
 
 def test_domain_schema_supports_archive_contract() -> None:
