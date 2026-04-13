@@ -25,6 +25,7 @@ from ..schemas import (
     AgentsResponse,
     AuthLoginBody,
     AuthRefreshBody,
+    AuthResetPasswordBody,
     AuthRegisterBody,
     AuthTokenResponse,
     BootstrapResponse,
@@ -111,6 +112,15 @@ def auth_refresh(request: Request, body: AuthRefreshBody) -> AuthTokenResponse:
         raise ApiError(401, "AUTH_INVALID_TOKEN", "登录态无效，请重新登录")
     access, refresh = jwt.issue_pair(user)
     return AuthTokenResponse(access_token=access, refresh_token=refresh)
+
+
+@router.post("/auth/reset-password")
+def auth_reset_password(request: Request, body: AuthResetPasswordBody) -> dict:
+    store: AuthStore = request.app.state.auth_store
+    username = _normalize_username(body.username)
+    new_password = _validate_password(body.new_password)
+    store.reset_password(username=username, new_password=new_password)
+    return {"ok": True}
 
 
 @router.post("/auth/logout")

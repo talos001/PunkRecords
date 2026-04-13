@@ -79,6 +79,22 @@ export async function authRefresh(params: {
   return parseJson<AuthTokens>(res);
 }
 
+export async function authResetPassword(params: {
+  baseUrl: string;
+  username: string;
+  newPassword: string;
+}): Promise<void> {
+  const res = await fetch(`${params.baseUrl}/api/v1/auth/reset-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      username: params.username,
+      new_password: params.newPassword,
+    }),
+  });
+  await parseJson<{ ok: boolean }>(res);
+}
+
 export async function authLogout(params: {
   baseUrl: string;
   accessToken: string;

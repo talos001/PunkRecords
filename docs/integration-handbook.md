@@ -111,6 +111,14 @@ curl -s -X PUT http://127.0.0.1:8765/api/v1/me/materials-path \
   -d '{"mode":"use_default","confirm_effective_path":"/your/materials/path"}'
 ```
 
+**忘记密码（按用户名重置）**
+
+```bash
+curl -s -X POST http://127.0.0.1:8765/api/v1/auth/reset-password \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"demo-user","new_password":"new-pass-123"}'
+```
+
 ---
 
 ## 5. 前端侧关注点
@@ -130,6 +138,8 @@ curl -s -X PUT http://127.0.0.1:8765/api/v1/me/materials-path \
 | 自动摄取无效果 | `chat_auto_ingest: true` 且本次请求**有附件**；查看后端日志是否有 `聊天后自动摄取失败` |
 | 前端跨域错误 | 核对 `VITE_API_BASE_URL` 与后端 host/port、CORS 列表 |
 
+补充：认证用户数据当前保存在仓库内 `var/auth/users.db`（SQLite）。若存在旧版 `var/auth/users.json`，服务启动时会在 SQLite 为空时自动迁移一次。
+
 ---
 
 ## 7. 相关文档
@@ -145,3 +155,4 @@ curl -s -X PUT http://127.0.0.1:8765/api/v1/me/materials-path \
 | 2026-04-12 | 初稿：联调步骤与 curl 自检 |
 | 2026-04-12 | 相关文档：区分 `backlog.md`（已计划实施）与 `function_plan.md`（讨论稿） |
 | 2026-04-13 | 增加 JWT 登录、受保护接口 Authorization 头与首登路径确认联调示例 |
+| 2026-04-13 | 用户认证存储由 JSON 切换为 SQLite（`var/auth/users.db`，兼容旧数据迁移） |

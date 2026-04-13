@@ -6,6 +6,7 @@ import hmac
 import json
 import os
 import secrets
+import sqlite3
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -51,93 +52,210 @@ class UserRecord:
 
 
 class AuthStore:
-    def __init__(self, file_path: Path) -> None:
-        self._file_path = file_path
+    def __init__(self, db_path: Path) -> None:
+        self._db_path = db_path
         self._lock = Lock()
-        self._users: dict[str, UserRecord] = {}
-        self._username_to_id: dict[str, str] = {}
-        self._load()
+        self._init_db()
+        self._migrate_from_json_if_needed()
 
-    def _load(self) -> None:
-        if not self._file_path.is_file():
+    def _connect(self) -> sqlite3.Connection:
+        conn = sqlite3.connect(self._db_path)
+        conn.row_factory = sqlite3.Row
+        return conn
+
+    def _init_db(self) -> None:
+        self._db_path.parent.mkdir(parents=True, exist_ok=True)
+        with self._connect() as conn:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS users (
+                    id TEXT PRIMARY KEY,
+                    username TEXT NOT NULL UNIQUE,
+                    password_salt TEXT NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    token_version INTEGER NOT NULL DEFAULT 0,
+                    materials_path TEXT,
+                    materials_path_confirmed INTEGER NOT NULL DEFAULT 0
+                )
+                """
+            )
+            conn.commit()
+
+    def _from_row(self, row: sqlite3.Row | None) -> UserRecord | None:
+        if row is None:
+            return None
+        return UserRecord(
+            id=str(row["id"]),
+            username=str(row["username"]),
+            password_salt=str(row["password_salt"]),
+            password_hash=str(row["password_hash"]),
+            token_version=int(row["token_version"]),
+            materials_path=row["materials_path"],
+            materials_path_confirmed=bool(row["materials_path_confirmed"]),
+        )
+
+    def _migrate_from_json_if_needed(self) -> None:
+        legacy_path = self._db_path.with_suffix(".json")
+        if not legacy_path.is_file():
             return
-        raw = json.loads(self._file_path.read_text(encoding="utf-8"))
-        if not isinstance(raw, dict):
-            return
-        users = raw.get("users") or []
+        with self._connect() as conn:
+            row = conn.execute("SELECT COUNT(1) AS cnt FROM users").fetchone()
+            assert row is not None
+            if int(row["cnt"]) > 0:
+                return
+        raw = json.loads(legacy_path.read_text(encoding="utf-8"))
+        users = raw.get("users") if isinstance(raw, dict) else None
         if not isinstance(users, list):
             return
-        for item in users:
-            if not isinstance(item, dict):
-                continue
-            rec = UserRecord(
-                id=str(item.get("id") or ""),
-                username=str(item.get("username") or ""),
-                password_salt=str(item.get("password_salt") or ""),
-                password_hash=str(item.get("password_hash") or ""),
-                token_version=int(item.get("token_version") or 0),
-                materials_path=item.get("materials_path"),
-                materials_path_confirmed=bool(item.get("materials_path_confirmed", False)),
-            )
-            if not rec.id or not rec.username:
-                continue
-            self._users[rec.id] = rec
-            self._username_to_id[rec.username] = rec.id
-
-    def _flush(self) -> None:
-        self._file_path.parent.mkdir(parents=True, exist_ok=True)
-        data = {"users": [u.to_dict() for u in self._users.values()]}
-        self._file_path.write_text(_json_dumps(data), encoding="utf-8")
+        with self._connect() as conn:
+            for item in users:
+                if not isinstance(item, dict):
+                    continue
+                uid = str(item.get("id") or "").strip()
+                username = str(item.get("username") or "").strip()
+                if not uid or not username:
+                    continue
+                conn.execute(
+                    """
+                    INSERT OR IGNORE INTO users (
+                        id, username, password_salt, password_hash, token_version,
+                        materials_path, materials_path_confirmed
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        uid,
+                        username,
+                        str(item.get("password_salt") or ""),
+                        str(item.get("password_hash") or ""),
+                        int(item.get("token_version") or 0),
+                        item.get("materials_path"),
+                        1 if bool(item.get("materials_path_confirmed", False)) else 0,
+                    ),
+                )
+            conn.commit()
 
     def create_user(self, username: str, password: str) -> UserRecord:
         with self._lock:
-            if username in self._username_to_id:
+            with self._connect() as conn:
+                exists = conn.execute(
+                    "SELECT 1 FROM users WHERE username = ?",
+                    (username,),
+                ).fetchone()
+            if exists is not None:
                 raise ApiError(409, "USER_EXISTS", "该用户名已存在")
-            salt = secrets.token_hex(16)
+            salt, pwd_hash = build_password_record(password)
             rec = UserRecord(
                 id=secrets.token_hex(12),
                 username=username,
                 password_salt=salt,
-                password_hash=_password_hash(password, salt),
+                password_hash=pwd_hash,
                 token_version=0,
                 materials_path=None,
                 materials_path_confirmed=False,
             )
-            self._users[rec.id] = rec
-            self._username_to_id[username] = rec.id
-            self._flush()
+            with self._connect() as conn:
+                conn.execute(
+                    """
+                    INSERT INTO users (
+                        id, username, password_salt, password_hash, token_version,
+                        materials_path, materials_path_confirmed
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        rec.id,
+                        rec.username,
+                        rec.password_salt,
+                        rec.password_hash,
+                        rec.token_version,
+                        rec.materials_path,
+                        1 if rec.materials_path_confirmed else 0,
+                    ),
+                )
+                conn.commit()
             return rec
+
+    def reset_password(self, username: str, new_password: str) -> UserRecord:
+        with self._lock:
+            with self._connect() as conn:
+                row = conn.execute(
+                    "SELECT * FROM users WHERE username = ?",
+                    (username,),
+                ).fetchone()
+                rec = self._from_row(row)
+                if rec is None:
+                    raise ApiError(404, "USER_NOT_FOUND", "用户不存在")
+                salt, pwd_hash = build_password_record(new_password)
+                conn.execute(
+                    """
+                    UPDATE users
+                    SET password_salt = ?, password_hash = ?, token_version = token_version + 1
+                    WHERE id = ?
+                    """,
+                    (salt, pwd_hash, rec.id),
+                )
+                conn.commit()
+                updated = conn.execute(
+                    "SELECT * FROM users WHERE id = ?",
+                    (rec.id,),
+                ).fetchone()
+            out = self._from_row(updated)
+            assert out is not None
+            return out
 
     def get_user_by_username(self, username: str) -> UserRecord | None:
         with self._lock:
-            uid = self._username_to_id.get(username)
-            if not uid:
-                return None
-            return self._users.get(uid)
+            with self._connect() as conn:
+                row = conn.execute(
+                    "SELECT * FROM users WHERE username = ?",
+                    (username,),
+                ).fetchone()
+            return self._from_row(row)
 
     def get_user_by_id(self, user_id: str) -> UserRecord | None:
         with self._lock:
-            return self._users.get(user_id)
+            with self._connect() as conn:
+                row = conn.execute(
+                    "SELECT * FROM users WHERE id = ?",
+                    (user_id,),
+                ).fetchone()
+            return self._from_row(row)
 
     def update_materials_path(
         self, user_id: str, *, materials_path: str | None, confirmed: bool
     ) -> UserRecord:
         with self._lock:
-            rec = self._users.get(user_id)
-            if rec is None:
-                raise ApiError(404, "USER_NOT_FOUND", "用户不存在")
-            rec.materials_path = materials_path
-            rec.materials_path_confirmed = confirmed
-            self._flush()
-            return rec
+            with self._connect() as conn:
+                exists = conn.execute(
+                    "SELECT 1 FROM users WHERE id = ?",
+                    (user_id,),
+                ).fetchone()
+                if exists is None:
+                    raise ApiError(404, "USER_NOT_FOUND", "用户不存在")
+                conn.execute(
+                    """
+                    UPDATE users
+                    SET materials_path = ?, materials_path_confirmed = ?
+                    WHERE id = ?
+                    """,
+                    (materials_path, 1 if confirmed else 0, user_id),
+                )
+                conn.commit()
+                row = conn.execute(
+                    "SELECT * FROM users WHERE id = ?",
+                    (user_id,),
+                ).fetchone()
+            updated = self._from_row(row)
+            assert updated is not None
+            return updated
 
     def bump_token_version(self, user_id: str) -> None:
         with self._lock:
-            rec = self._users.get(user_id)
-            if rec is None:
-                return
-            rec.token_version += 1
-            self._flush()
+            with self._connect() as conn:
+                conn.execute(
+                    "UPDATE users SET token_version = token_version + 1 WHERE id = ?",
+                    (user_id,),
+                )
+                conn.commit()
 
 
 def _password_hash(password: str, salt: str) -> str:
@@ -153,6 +271,11 @@ def _password_hash(password: str, salt: str) -> str:
 def verify_password(password: str, salt: str, expected_hash: str) -> bool:
     actual = _password_hash(password, salt)
     return hmac.compare_digest(actual, expected_hash)
+
+
+def build_password_record(password: str) -> tuple[str, str]:
+    salt = secrets.token_hex(16)
+    return salt, _password_hash(password, salt)
 
 
 class JWTService:

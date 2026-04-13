@@ -25,7 +25,7 @@ async def lifespan(app: FastAPI):
     cfg.materials_vault_path.mkdir(parents=True, exist_ok=True)
     app.state.config = cfg
     app.state.llm_registry = LLMRegistry(cfg)
-    app.state.auth_store = AuthStore((Path.cwd() / "var" / "auth" / "users.json"))
+    app.state.auth_store = AuthStore((Path.cwd() / "var" / "auth" / "users.db"))
     app.state.jwt_service = JWTService(get_auth_secret())
     yield
 

@@ -85,6 +85,11 @@ class AuthRefreshBody(BaseModel):
     refresh_token: str
 
 
+class AuthResetPasswordBody(BaseModel):
+    username: str
+    new_password: str
+
+
 class AuthTokenResponse(BaseModel):
     access_token: str
     refresh_token: str

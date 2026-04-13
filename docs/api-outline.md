@@ -28,6 +28,7 @@
 |------|------|------|
 | `POST` | `/api/v1/auth/register` | 注册并返回 token 对 |
 | `POST` | `/api/v1/auth/login` | 登录并返回 token 对 |
+| `POST` | `/api/v1/auth/reset-password` | 按用户名重置密码（本地开发场景） |
 | `POST` | `/api/v1/auth/refresh` | 用 refresh token 换新 token 对 |
 | `POST` | `/api/v1/auth/logout` | 使当前用户 token 版本失效 |
 | `GET` | `/api/v1/me/bootstrap` | 返回当前用户、材料路径确认状态与当前生效路径 |
@@ -236,3 +237,4 @@
 | 2026-04-12 | 初稿：健康、领域、对话、可选会话/任务/Agent/设置/图谱 |
 | 2026-04-12 | 已实现 P0：`GET /health`、`GET /version`、`GET /domains`、`POST /chat`、`GET /agents`、`GET|PUT /settings/agent`、`GET /settings`（见 `src/api/`） |
 | 2026-04-12 | 已实现：`POST /chat/stream`（SSE）、`POST /ingest`、配置项 `chat_auto_ingest` |
+| 2026-04-13 | 新增 `POST /auth/reset-password`，用于本地开发场景下按用户名重置密码 |

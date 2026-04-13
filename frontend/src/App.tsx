@@ -11,6 +11,7 @@ import {
   authLogout,
   authRefresh,
   authRegister,
+  authResetPassword,
   fetchBootstrap,
   putMaterialsPath,
   type Bootstrap,
@@ -220,9 +221,12 @@ export function App() {
   const [bootstrap, setBootstrap] = useState<Bootstrap | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [authMode, setAuthMode] = useState<"login" | "register">("login");
+  const [authMode, setAuthMode] = useState<"login" | "register" | "reset">(
+    "login",
+  );
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const [showPathModal, setShowPathModal] = useState(false);
@@ -824,7 +828,27 @@ export function App() {
       {showAuthModal && (
         <div className="modal-mask" role="dialog" aria-modal>
           <div className="modal-card">
-            <h3>{authMode === "login" ? "请先登录" : "创建账号"}</h3>
+            <button
+              type="button"
+              className="modal-close"
+              aria-label="关闭"
+              onClick={() => {
+                setShowAuthModal(false);
+                setPendingAction(null);
+                setAuthError("");
+                setPassword("");
+                setConfirmPassword("");
+              }}
+            >
+              ×
+            </button>
+            <h3>
+              {authMode === "login"
+                ? "请先登录"
+                : authMode === "register"
+                  ? "创建账号"
+                  : "重置密码"}
+            </h3>
             <input
               className="modal-input"
               placeholder="用户名"
@@ -834,19 +858,47 @@ export function App() {
             <input
               className="modal-input"
               type="password"
-              placeholder="密码"
+              placeholder={authMode === "reset" ? "新密码" : "密码"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
+            {(authMode === "register" || authMode === "reset") && (
+              <input
+                className="modal-input"
+                type="password"
+                placeholder="确认密码"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+              />
+            )}
             {authError && <p className="modal-error">{authError}</p>}
             <button
               type="button"
               className="modal-primary"
               disabled={authLoading}
               onClick={async () => {
+                if (
+                  (authMode === "register" || authMode === "reset") &&
+                  password !== confirmPassword
+                ) {
+                  setAuthError("两次输入的密码不一致");
+                  return;
+                }
                 setAuthLoading(true);
                 setAuthError("");
                 try {
+                  if (authMode === "reset") {
+                    await authResetPassword({
+                      baseUrl: API_BASE_URL,
+                      username,
+                      newPassword: password,
+                    });
+                    setAuthMode("login");
+                    setAuthError("密码已重置，请使用新密码登录");
+                    setPassword("");
+                    setConfirmPassword("");
+                    return;
+                  }
                   const tokens =
                     authMode === "login"
                       ? await authLogin({
@@ -868,16 +920,37 @@ export function App() {
                 }
               }}
             >
-              {authLoading ? "提交中..." : authMode === "login" ? "登录" : "注册并登录"}
+              {authLoading
+                ? "提交中..."
+                : authMode === "login"
+                  ? "登录"
+                  : authMode === "register"
+                    ? "注册并登录"
+                    : "重置密码"}
             </button>
             <button
               type="button"
               className="modal-secondary"
-              onClick={() =>
-                setAuthMode((m) => (m === "login" ? "register" : "login"))
-              }
+              onClick={() => {
+                setAuthMode((m) => (m === "login" ? "register" : "login"));
+                setAuthError("");
+                setPassword("");
+                setConfirmPassword("");
+              }}
             >
               {authMode === "login" ? "没有账号？去注册" : "已有账号？去登录"}
+            </button>
+            <button
+              type="button"
+              className="modal-secondary"
+              onClick={() => {
+                setAuthMode("reset");
+                setAuthError("");
+                setPassword("");
+                setConfirmPassword("");
+              }}
+            >
+              忘记密码？
             </button>
           </div>
         </div>
