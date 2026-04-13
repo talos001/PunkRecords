@@ -219,6 +219,9 @@ def test_domains_crud_happy_path(domains_client, tmp_path: Path) -> None:
     deleted = client.delete("/api/v1/domains/physics", headers=headers)
     assert deleted.status_code == 200
     assert deleted.json()["ok"] is True
+    assert deleted.json()["domain"]["id"] == "physics"
+    assert deleted.json()["domain"]["enabled"] is False
+    assert deleted.json()["domain"]["is_archived"] is True
 
 
 def test_delete_domain_returns_409_when_materials_or_index_not_empty(
@@ -258,3 +261,19 @@ def test_delete_missing_domain_returns_404_even_if_data_exists(domains_client, t
     resp = client.delete("/api/v1/domains/ghost-domain", headers=headers)
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "DOMAIN_NOT_FOUND"
+
+
+def test_delete_last_active_domain_returns_409(domains_client: tuple[TestClient, dict[str, str]]) -> None:
+    client, headers = domains_client
+    listing = client.get("/api/v1/domains")
+    assert listing.status_code == 200
+    active_ids = [d["id"] for d in listing.json()["domains"]]
+
+    # 先归档除一个外的所有活跃领域，触发最后一个活跃领域保护。
+    for domain_id in active_ids[1:]:
+        resp = client.delete(f"/api/v1/domains/{domain_id}", headers=headers)
+        assert resp.status_code == 200
+
+    blocked = client.delete(f"/api/v1/domains/{active_ids[0]}", headers=headers)
+    assert blocked.status_code == 409
+    assert blocked.json()["error"]["code"] == "DOMAIN_LAST_ACTIVE"

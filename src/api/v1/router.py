@@ -20,8 +20,9 @@ from ..chat_service import run_chat, run_chat_stream
 from ..deps import require_auth, require_ready_user
 from ..domains_data import (
     DEFAULT_DOMAIN_ID,
+    active_domain_count,
+    archive_domain,
     create_domain,
-    delete_domain,
     domain_exists,
     domains_response,
     get_domain,
@@ -256,10 +257,13 @@ def remove_domain(request: Request, domain_id: str) -> dict:
     index_root = cfg.domain_index_paths.get(domain_id)
     if index_root and has_index_data(index_root):
         raise ApiError(409, "DOMAIN_NOT_EMPTY", "该领域已有材料或索引数据，无法删除")
-    deleted = delete_domain(domain_id)
-    if not deleted:
+    target = get_domain(domain_id)
+    if target is not None and active_domain_count() <= 1:
+        raise ApiError(409, "DOMAIN_LAST_ACTIVE", "至少保留一个活跃领域")
+    archived = archive_domain(domain_id)
+    if archived is None:
         raise ApiError(404, "DOMAIN_NOT_FOUND", "领域不存在")
-    return {"ok": True}
+    return {"ok": True, "domain": archived}
 
 
 @router.post("/chat", response_model=ChatResponse)

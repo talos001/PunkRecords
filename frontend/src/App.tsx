@@ -488,6 +488,18 @@ export function App() {
     () => domainsList.find((d) => d.id === domainId) ?? domainsList[0],
     [domainId, domainsList],
   );
+  const safeCurrentDomain = useMemo(
+    () =>
+      currentDomain ?? {
+        id: DEFAULT_DOMAIN_ID,
+        name: "未配置领域",
+        description: "暂无可用领域，请先在领域管理中创建或恢复领域。",
+        emoji: "📁",
+        variant: "coral" as const,
+        status: "active" as const,
+      },
+    [currentDomain],
+  );
   const activeDomains = useMemo(
     () => domainsList.filter((d) => d.status === "active"),
     [domainsList],
@@ -535,7 +547,7 @@ export function App() {
 
     const filesSnapshot = [...pendingFiles];
     const domainSnapshot = domainId;
-    const nameSnapshot = currentDomain.name;
+    const nameSnapshot = safeCurrentDomain.name;
 
     setMessages((m) => [...m, userMsg]);
     setDraft("");
@@ -658,7 +670,7 @@ export function App() {
   }, [
     accessToken,
     clearSession,
-    currentDomain.name,
+    safeCurrentDomain.name,
     domainId,
     draft,
     ensureReady,
@@ -816,9 +828,9 @@ export function App() {
             </div>
 
             <p className="context-hint">
-              当前区域：<strong>{currentDomain.name}</strong>
+              当前区域：<strong>{safeCurrentDomain.name}</strong>
               <span className="context-hint-dot">·</span>
-              {currentDomain.description}
+              {safeCurrentDomain.description}
             </p>
 
             {navActive === "settings" && (
@@ -834,7 +846,7 @@ export function App() {
                   </button>
                 </div>
                 <p className="domain-manager-hint">
-                  支持新增、编辑与归档。归档会先尝试删除，若领域非空则自动改为归档。
+                  支持新增、编辑与归档。归档保留记录；若领域含材料或索引数据会被保护，无法归档。
                 </p>
                 {domainError && <p className="domain-manager-error">{domainError}</p>}
                 {domainSuccess && (

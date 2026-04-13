@@ -55,7 +55,7 @@
 |------|------|------|
 | `GET` | `/api/v1/domains` | 返回领域列表（见下） |
 | `POST` | `/api/v1/domains` | 新增领域（名称、描述、图标与可选路径覆盖） |
-| `PUT` | `/api/v1/domains/{id}` | 编辑领域元数据（名称、描述、图标等） |
+| `PATCH` | `/api/v1/domains/{id}` | 编辑领域元数据（名称、描述、图标等） |
 | `DELETE` | `/api/v1/domains/{id}` | 归档领域（软删除，保留历史数据） |
 
 **响应示例**
@@ -76,7 +76,7 @@
 }
 ```
 
-- `id`：与后端 Vault 路由表一致，**必填**。
+- `id`：由后端基于名称自动生成 slug 并下发给前端。
 - `emoji` / `variant`：可选；若缺省，前端可回退到本地默认展示。
 - `default_domain_id`：与产品策略一致（当前产品默认为幼儿发展）。
 
@@ -86,7 +86,6 @@
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| `id` | string | 是 | 领域唯一标识（建议 kebab-case） |
 | `name` | string | 是 | 用户可见名称 |
 | `description` | string | 否 | 领域描述 |
 | `emoji` | string | 否 | 领域图标 |
@@ -94,12 +93,14 @@
 | `material_path` | string | 否 | 领域材料目录覆盖；不传时走 fallback |
 | `index_path` | string | 否 | 领域索引目录覆盖；不传时走 fallback |
 
+> 说明：当前实现中客户端无需传 `id`，服务端会自动生成唯一 slug（冲突时自动追加后缀）。
+
 **fallback 语义**
 
 - 当 `material_path` / `index_path` 未传或为空时，服务端按配置的默认目录策略自动推导该领域路径并创建目录。
 - 已配置 `domain_*_paths[domain_id]` 显式映射时，显式映射优先；未命中时才走默认 fallback 目录策略。
 
-### 2.2 编辑领域（`PUT /api/v1/domains/{id}`）
+### 2.2 编辑领域（`PATCH /api/v1/domains/{id}`）
 
 - 允许更新 `name`、`description`、`emoji`、`variant` 及可选路径覆盖字段。
 - 路径字段省略时保持原值，不会触发重置为默认 fallback。
@@ -108,15 +109,16 @@
 
 - 语义为归档（soft delete），用于 UI 的「归档」操作；不建议物理删除已写入材料与索引。
 - 成功后该领域不再出现在默认 `GET /domains` 列表中。
+- 为避免误操作，服务端会保证至少保留一个 active domain；当删除最后一个 active domain 时返回 `409`。
 
 ### 2.4 领域接口错误码
 
 | HTTP | `error.code` | 场景 |
 |------|--------------|------|
 | `400` | `INVALID_DOMAIN_PAYLOAD` | 字段非法（空名称、非法 id、路径无效等） |
-| `404` | `DOMAIN_NOT_FOUND` | 目标领域不存在或已归档 |
-| `409` | `DOMAIN_ALREADY_EXISTS` | 创建时 `id` 冲突；前端应回退展示已归档冲突提示并提供恢复/取消 |
-| `409` | `DOMAIN_NAME_CONFLICT` | 领域名称冲突（按后端策略启用时） |
+| `404` | `DOMAIN_NOT_FOUND` | 目标领域不存在 |
+| `409` | `DOMAIN_LAST_ACTIVE` | 删除会导致 active domain 数量变为 0 |
+| `409` | `DOMAIN_NOT_EMPTY` | 领域已有材料或索引数据，禁止归档/删除 |
 | `422` | `DOMAIN_PATH_INVALID` | 路径校验失败或不可写 |
 | `500` | `DOMAIN_PERSISTENCE_FAILED` | 持久化失败 |
 

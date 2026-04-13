@@ -14,6 +14,8 @@ class DomainDict(TypedDict, total=False):
     emoji: str
     variant: str
     enabled: bool
+    is_archived: bool
+    archived_at: str | None
 
 
 _INITIAL_DOMAINS: List[DomainDict] = [
@@ -73,6 +75,8 @@ def _record_to_domain(rec: DomainRecord) -> DomainDict:
         "emoji": rec.emoji,
         "variant": rec.variant,
         "enabled": rec.enabled and (not rec.is_archived),
+        "is_archived": rec.is_archived,
+        "archived_at": rec.archived_at,
     }
 
 
@@ -152,6 +156,20 @@ def update_domain(domain_id: str, updates: dict[str, Any]) -> DomainDict | None:
 def delete_domain(domain_id: str) -> bool:
     _ensure_bootstrapped()
     return _STORE.delete_domain(domain_id)
+
+
+def archive_domain(domain_id: str) -> DomainDict | None:
+    _ensure_bootstrapped()
+    try:
+        rec = _STORE.archive_domain(domain_id)
+    except KeyError:
+        return None
+    return _record_to_domain(rec)
+
+
+def active_domain_count() -> int:
+    _ensure_bootstrapped()
+    return len(_STORE.list_domains(view="active"))
 
 
 def has_materials_data(materials_root: Path, domain_id: str) -> bool:
