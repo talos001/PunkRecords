@@ -1,6 +1,6 @@
 # 前后端联调手册（当前已实现能力）
 
-面向：**本地**同时启动 FastAPI 与 Vite 前端，验证聊天、材料落盘、摄取与流式接口。
+面向：**本地**同时启动 FastAPI 与 Vite 前端，验证认证、聊天、材料落盘、摄取与流式接口。
 
 ---
 
@@ -64,10 +64,21 @@ curl -s http://127.0.0.1:8765/api/v1/health
 curl -s http://127.0.0.1:8765/api/v1/domains | head -c 400
 ```
 
+**注册并登录（获取 token）**
+
+```bash
+TOKENS=$(curl -s -X POST http://127.0.0.1:8765/api/v1/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"demo-user","password":"demo-pass-123"}')
+
+ACCESS_TOKEN=$(echo "$TOKENS" | python3 -c 'import sys,json;print(json.load(sys.stdin)["access_token"])')
+```
+
 **聊天（multipart，文本）**
 
 ```bash
 curl -s -X POST http://127.0.0.1:8765/api/v1/chat \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
   -F 'domain_id=math' \
   -F 'text=你好，联调测试'
 ```
@@ -78,6 +89,7 @@ curl -s -X POST http://127.0.0.1:8765/api/v1/chat \
 # 先将测试文件放入 materials_vault_path 下，例如 math/hello.md
 curl -s -X POST http://127.0.0.1:8765/api/v1/ingest \
   -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
   -d '{"domain_id":"math","relative_path":"hello.md"}'
 ```
 
@@ -85,8 +97,18 @@ curl -s -X POST http://127.0.0.1:8765/api/v1/ingest \
 
 ```bash
 curl -N -X POST http://127.0.0.1:8765/api/v1/chat/stream \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
   -F 'domain_id=math' \
   -F 'text=流式测试'
+```
+
+**首登路径确认（未确认会收到 428）**
+
+```bash
+curl -s -X PUT http://127.0.0.1:8765/api/v1/me/materials-path \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"mode":"use_default","confirm_effective_path":"/your/materials/path"}'
 ```
 
 ---
@@ -122,3 +144,4 @@ curl -N -X POST http://127.0.0.1:8765/api/v1/chat/stream \
 |------|------|
 | 2026-04-12 | 初稿：联调步骤与 curl 自检 |
 | 2026-04-12 | 相关文档：区分 `backlog.md`（已计划实施）与 `function_plan.md`（讨论稿） |
+| 2026-04-13 | 增加 JWT 登录、受保护接口 Authorization 头与首登路径确认联调示例 |

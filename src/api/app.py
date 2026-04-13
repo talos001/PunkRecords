@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
@@ -11,6 +12,8 @@ from fastapi.responses import JSONResponse
 from src.config import load_app_config
 from src.llm.registry import LLMRegistry
 
+from .auth import AuthStore, JWTService, get_auth_secret
+from .errors import ApiError
 from .v1.router import router as v1_router
 
 API_PREFIX = "/api/v1"
@@ -22,6 +25,8 @@ async def lifespan(app: FastAPI):
     cfg.materials_vault_path.mkdir(parents=True, exist_ok=True)
     app.state.config = cfg
     app.state.llm_registry = LLMRegistry(cfg)
+    app.state.auth_store = AuthStore((Path.cwd() / "var" / "auth" / "users.json"))
+    app.state.jwt_service = JWTService(get_auth_secret())
     yield
 
 
@@ -56,6 +61,18 @@ def create_app() -> FastAPI:
             }
         }
         return JSONResponse(status_code=exc.status_code, content=body)
+
+    @app.exception_handler(ApiError)
+    async def api_err_handler(request: Request, exc: ApiError) -> JSONResponse:
+        content: dict[str, Any] = {
+            "error": {
+                "code": exc.code,
+                "message": exc.message,
+            }
+        }
+        if exc.extra:
+            content["error"]["details"] = exc.extra
+        return JSONResponse(status_code=exc.status_code, content=content)
 
     @app.exception_handler(RequestValidationError)
     async def validation_exc_handler(

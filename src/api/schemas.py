@@ -71,6 +71,49 @@ class SettingsResponse(BaseModel):
     language: str = "zh-CN"
 
 
+class AuthLoginBody(BaseModel):
+    username: str
+    password: str
+
+
+class AuthRegisterBody(BaseModel):
+    username: str
+    password: str
+
+
+class AuthRefreshBody(BaseModel):
+    refresh_token: str
+
+
+class AuthTokenResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+
+
+class BootstrapUserOut(BaseModel):
+    id: str
+    username: str
+
+
+class BootstrapResponse(BaseModel):
+    user: BootstrapUserOut
+    vault_config_status: str
+    effective_materials_path: str
+    source: str
+
+
+class MaterialsPathBody(BaseModel):
+    mode: str
+    custom_path: Optional[str] = None
+    confirm_effective_path: str
+
+
+class MaterialsPathResponse(BaseModel):
+    effective_materials_path: str
+    vault_config_status: str
+
+
 class IngestBody(BaseModel):
     domain_id: str
     relative_path: str

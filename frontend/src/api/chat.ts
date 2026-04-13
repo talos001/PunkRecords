@@ -14,11 +14,30 @@ export type StreamEvent =
   | { type: "done"; id: string; job_ids: string[] }
   | { type: "error"; message: string };
 
+export class ApiHttpError extends Error {
+  status: number;
+  code: string;
+  details?: Record<string, unknown>;
+
+  constructor(
+    status: number,
+    code: string,
+    message: string,
+    details?: Record<string, unknown>,
+  ) {
+    super(message);
+    this.status = status;
+    this.code = code;
+    this.details = details;
+  }
+}
+
 export async function postChat(params: {
   baseUrl: string;
   domainId: string;
   text: string;
   files: File[];
+  accessToken?: string;
 }): Promise<ChatResponseBody> {
   const fd = new FormData();
   fd.append("domain_id", params.domainId);
@@ -29,14 +48,28 @@ export async function postChat(params: {
   const r = await fetch(`${params.baseUrl}/api/v1/chat`, {
     method: "POST",
     body: fd,
+    headers: params.accessToken
+      ? { Authorization: `Bearer ${params.accessToken}` }
+      : undefined,
   });
   const data = (await r.json().catch(() => ({}))) as
     | ChatResponseBody
     | { error?: { message?: string } };
   if (!r.ok) {
-    const errBody = data as { error?: { message?: string } };
+    const errBody = data as {
+      error?: {
+        code?: string;
+        message?: string;
+        details?: Record<string, unknown>;
+      };
+    };
     const msg = errBody.error?.message ?? r.statusText;
-    throw new Error(msg || "请求失败");
+    throw new ApiHttpError(
+      r.status,
+      errBody.error?.code ?? "http_error",
+      msg || "请求失败",
+      errBody.error?.details,
+    );
   }
   return data as ChatResponseBody;
 }
@@ -49,6 +82,7 @@ export async function postChatStream(params: {
   files: File[];
   onEvent: (ev: StreamEvent) => void;
   signal?: AbortSignal;
+  accessToken?: string;
 }): Promise<void> {
   const fd = new FormData();
   fd.append("domain_id", params.domainId);
@@ -60,13 +94,25 @@ export async function postChatStream(params: {
     method: "POST",
     body: fd,
     signal: params.signal,
+    headers: params.accessToken
+      ? { Authorization: `Bearer ${params.accessToken}` }
+      : undefined,
   });
   if (!r.ok) {
     const data = (await r.json().catch(() => ({}))) as {
-      error?: { message?: string };
+      error?: {
+        code?: string;
+        message?: string;
+        details?: Record<string, unknown>;
+      };
     };
     const msg = data.error?.message ?? r.statusText;
-    throw new Error(msg || "请求失败");
+    throw new ApiHttpError(
+      r.status,
+      data.error?.code ?? "http_error",
+      msg || "请求失败",
+      data.error?.details,
+    );
   }
   if (!r.body) {
     throw new Error("无响应体");

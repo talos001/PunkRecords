@@ -758,3 +758,93 @@ body {
     min-height: 0;
   }
 }
+
+.auth-indicator {
+  margin-top: 0.5rem;
+  text-align: right;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.auth-logout {
+  margin-left: 0.6rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 0.22rem 0.5rem;
+  cursor: pointer;
+}
+
+.modal-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.42);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.modal-card {
+  width: min(520px, 100%);
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.18);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.modal-input {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.58rem 0.7rem;
+  font-size: 0.92rem;
+}
+
+.modal-subtitle {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  word-break: break-all;
+}
+
+.modal-radio {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.9rem;
+}
+
+.modal-primary {
+  border: none;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #fff;
+  padding: 0.6rem 0.75rem;
+  cursor: pointer;
+}
+
+.modal-primary:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.modal-secondary {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 0.55rem 0.75rem;
+  cursor: pointer;
+}
+
+.modal-error {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 0.82rem;
+}

@@ -6,7 +6,16 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { postChatStream } from "./api/chat";
+import {
+  authLogin,
+  authLogout,
+  authRefresh,
+  authRegister,
+  fetchBootstrap,
+  putMaterialsPath,
+  type Bootstrap,
+} from "./api/auth";
+import { ApiHttpError, postChatStream } from "./api/chat";
 import { apiDomainsToLocal, fetchDomains } from "./api/domains";
 import {
   PYTHAGORAS_BUBBLE_LABEL,
@@ -33,11 +42,15 @@ type ChatMessage = {
   streaming?: boolean;
 };
 
+type AuthState = "anonymous" | "authenticated_unconfigured" | "authenticated_ready";
+type PendingAction = "send" | "settings" | "domain";
+
 function uid(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
 const STORAGE_SIDEBAR_COLLAPSED = "punkrecords_sidebar_collapsed";
+const STORAGE_REFRESH_TOKEN = "punkrecords_refresh_token";
 
 /** 无记录时默认收起，与桌面「折叠」语义一致 */
 function loadSidebarCollapsed(): boolean {
@@ -201,6 +214,22 @@ export function App() {
   const [draft, setDraft] = useState("");
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [sending, setSending] = useState(false);
+  const [authState, setAuthState] = useState<AuthState>("anonymous");
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [refreshToken, setRefreshToken] = useState<string | null>(null);
+  const [bootstrap, setBootstrap] = useState<Bootstrap | null>(null);
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authMode, setAuthMode] = useState<"login" | "register">("login");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [authError, setAuthError] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
+  const [showPathModal, setShowPathModal] = useState(false);
+  const [pathMode, setPathMode] = useState<"use_default" | "custom">("use_default");
+  const [customPath, setCustomPath] = useState("");
+  const [pathError, setPathError] = useState("");
+  const [pathSubmitting, setPathSubmitting] = useState(false);
   const messagesRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -208,10 +237,77 @@ export function App() {
   const streamAbortRef = useRef<AbortController | null>(null);
   /** 离线演示回复的定时器（切换领域时清除） */
   const demoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const restoredRef = useRef(false);
 
   useEffect(() => {
     setDomainId(loadSavedDomainId());
+    try {
+      const saved = localStorage.getItem(STORAGE_REFRESH_TOKEN);
+      if (saved) setRefreshToken(saved);
+    } catch {
+      /* ignore */
+    }
   }, []);
+
+  useEffect(() => {
+    if (!useLiveApi || !refreshToken || restoredRef.current) return;
+    restoredRef.current = true;
+    let cancelled = false;
+    authRefresh({ baseUrl: API_BASE_URL, refreshToken })
+      .then((tokens) => {
+        if (cancelled) return;
+        setAccessToken(tokens.access_token);
+        setRefreshToken(tokens.refresh_token);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setAuthState("anonymous");
+        setAccessToken(null);
+        setRefreshToken(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshToken]);
+
+  useEffect(() => {
+    if (!useLiveApi || !accessToken) return;
+    let cancelled = false;
+    fetchBootstrap({ baseUrl: API_BASE_URL, accessToken })
+      .then((data) => {
+        if (cancelled) return;
+        setBootstrap(data);
+        const nextState =
+          data.vault_config_status === "configured"
+            ? "authenticated_ready"
+            : "authenticated_unconfigured";
+        setAuthState(nextState);
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        if (e instanceof ApiHttpError && e.status === 401) {
+          setAuthState("anonymous");
+          setAccessToken(null);
+          setRefreshToken(null);
+          return;
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken]);
+
+  useEffect(() => {
+    try {
+      if (refreshToken) {
+        localStorage.setItem(STORAGE_REFRESH_TOKEN, refreshToken);
+      } else {
+        localStorage.removeItem(STORAGE_REFRESH_TOKEN);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [refreshToken]);
 
   /** 切换知识区域：清空对话，回到空状态，并中止进行中的发送 */
   useEffect(() => {
@@ -272,6 +368,52 @@ export function App() {
     });
   }, [messages]);
 
+  useEffect(() => {
+    if (authState === "anonymous") {
+      setShowAuthModal(Boolean(pendingAction));
+      setShowPathModal(false);
+      return;
+    }
+    if (authState === "authenticated_unconfigured") {
+      setShowAuthModal(false);
+      setShowPathModal(true);
+      return;
+    }
+    setShowAuthModal(false);
+    setShowPathModal(false);
+  }, [authState, pendingAction]);
+
+  const clearSession = useCallback(() => {
+    setAccessToken(null);
+    setRefreshToken(null);
+    setBootstrap(null);
+    setAuthState("anonymous");
+  }, []);
+
+  const ensureReady = useCallback((action: PendingAction): boolean => {
+    if (!useLiveApi) return true;
+    if (authState === "anonymous") {
+      setPendingAction(action);
+      setShowAuthModal(true);
+      return false;
+    }
+    if (authState === "authenticated_unconfigured") {
+      setPendingAction(action);
+      setShowPathModal(true);
+      return false;
+    }
+    return true;
+  }, [authState]);
+
+  const runPendingAction = useCallback(() => {
+    if (pendingAction === "send") {
+      void send();
+    } else if (pendingAction === "settings") {
+      setNavActive("settings");
+    }
+    setPendingAction(null);
+  }, [pendingAction]);
+
   const currentDomain = useMemo(
     () => domainsList.find((d) => d.id === domainId) ?? domainsList[0],
     [domainId, domainsList],
@@ -288,6 +430,7 @@ export function App() {
   }, []);
 
   const send = useCallback(async () => {
+    if (!ensureReady("send")) return;
     const text = draft.trim();
     const hasFiles = pendingFiles.length > 0;
     if (!text && !hasFiles) return;
@@ -335,6 +478,7 @@ export function App() {
           text,
           files: filesSnapshot,
           signal: ac.signal,
+          accessToken: accessToken ?? undefined,
           onEvent: (ev) => {
             // 不要用服务端 start.id 替换本条消息的 id：setState 异步，紧随其后的 delta
             // 会用新 id 去匹配，而树里可能仍是旧 id，导致永远不拼接正文、一直停在思考提示。
@@ -387,6 +531,18 @@ export function App() {
         ) {
           return;
         }
+        if (e instanceof ApiHttpError) {
+          if (e.status === 401) {
+            clearSession();
+            setPendingAction("send");
+            return;
+          }
+          if (e.status === 428) {
+            setAuthState("authenticated_unconfigured");
+            setPendingAction("send");
+            return;
+          }
+        }
         const msg = e instanceof Error ? e.message : "发送失败";
         setMessages((m) =>
           m.map((x) =>
@@ -414,7 +570,15 @@ export function App() {
         },
       ]);
     }, 400);
-  }, [draft, pendingFiles, domainId, currentDomain.name]);
+  }, [
+    accessToken,
+    clearSession,
+    currentDomain.name,
+    domainId,
+    draft,
+    ensureReady,
+    pendingFiles,
+  ]);
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -477,7 +641,10 @@ export function App() {
                 type="button"
                 className={`sidebar-nav-item${navActive === item.id ? " sidebar-nav-item--active" : ""}`}
                 title={item.label}
-                onClick={() => setNavActive(item.id)}
+                onClick={() => {
+                  if (item.id === "settings" && !ensureReady("settings")) return;
+                  setNavActive(item.id);
+                }}
               >
                 <span className="sidebar-nav-icon">{NAV_ICONS[item.id]}</span>
                 <span className="sidebar-nav-label">{item.label}</span>
@@ -625,9 +792,157 @@ export function App() {
                 </button>
               </div>
             </footer>
+            {useLiveApi && authState !== "anonymous" && (
+              <div className="auth-indicator">
+                已登录：{bootstrap?.user.username ?? "用户"}
+                <button
+                  type="button"
+                  className="auth-logout"
+                  onClick={async () => {
+                    if (accessToken) {
+                      try {
+                        await authLogout({ baseUrl: API_BASE_URL, accessToken });
+                      } catch {
+                        /* ignore */
+                      }
+                    }
+                    clearSession();
+                  }}
+                >
+                  退出登录
+                </button>
+              </div>
+            )}
           </div>
         </section>
       </div>
+      {showAuthModal && (
+        <div className="modal-mask" role="dialog" aria-modal>
+          <div className="modal-card">
+            <h3>{authMode === "login" ? "请先登录" : "创建账号"}</h3>
+            <input
+              className="modal-input"
+              placeholder="用户名"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+            />
+            <input
+              className="modal-input"
+              type="password"
+              placeholder="密码"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+            {authError && <p className="modal-error">{authError}</p>}
+            <button
+              type="button"
+              className="modal-primary"
+              disabled={authLoading}
+              onClick={async () => {
+                setAuthLoading(true);
+                setAuthError("");
+                try {
+                  const tokens =
+                    authMode === "login"
+                      ? await authLogin({
+                          baseUrl: API_BASE_URL,
+                          username,
+                          password,
+                        })
+                      : await authRegister({
+                          baseUrl: API_BASE_URL,
+                          username,
+                          password,
+                        });
+                  setAccessToken(tokens.access_token);
+                  setRefreshToken(tokens.refresh_token);
+                } catch (e) {
+                  setAuthError(e instanceof Error ? e.message : "登录失败");
+                } finally {
+                  setAuthLoading(false);
+                }
+              }}
+            >
+              {authLoading ? "提交中..." : authMode === "login" ? "登录" : "注册并登录"}
+            </button>
+            <button
+              type="button"
+              className="modal-secondary"
+              onClick={() =>
+                setAuthMode((m) => (m === "login" ? "register" : "login"))
+              }
+            >
+              {authMode === "login" ? "没有账号？去注册" : "已有账号？去登录"}
+            </button>
+          </div>
+        </div>
+      )}
+      {showPathModal && bootstrap && (
+        <div className="modal-mask" role="dialog" aria-modal>
+          <div className="modal-card">
+            <h3>确认材料库保存位置</h3>
+            <p className="modal-subtitle">
+              当前生效路径：{pathMode === "custom" ? customPath || "（请输入）" : bootstrap.effective_materials_path}
+            </p>
+            <label className="modal-radio">
+              <input
+                type="radio"
+                checked={pathMode === "use_default"}
+                onChange={() => setPathMode("use_default")}
+              />
+              使用默认路径
+            </label>
+            <label className="modal-radio">
+              <input
+                type="radio"
+                checked={pathMode === "custom"}
+                onChange={() => setPathMode("custom")}
+              />
+              使用自定义路径
+            </label>
+            {pathMode === "custom" && (
+              <input
+                className="modal-input"
+                placeholder="请输入自定义目录路径"
+                value={customPath}
+                onChange={(e) => setCustomPath(e.target.value)}
+              />
+            )}
+            {pathError && <p className="modal-error">{pathError}</p>}
+            <button
+              type="button"
+              className="modal-primary"
+              disabled={pathSubmitting || !accessToken}
+              onClick={async () => {
+                if (!accessToken) return;
+                setPathSubmitting(true);
+                setPathError("");
+                const effective =
+                  pathMode === "custom"
+                    ? customPath.trim()
+                    : bootstrap.effective_materials_path;
+                try {
+                  await putMaterialsPath({
+                    baseUrl: API_BASE_URL,
+                    accessToken,
+                    mode: pathMode,
+                    customPath: pathMode === "custom" ? customPath.trim() : undefined,
+                    confirmEffectivePath: effective,
+                  });
+                  setAuthState("authenticated_ready");
+                  runPendingAction();
+                } catch (e) {
+                  setPathError(e instanceof Error ? e.message : "保存失败");
+                } finally {
+                  setPathSubmitting(false);
+                }
+              }}
+            >
+              {pathSubmitting ? "保存中..." : "确认并继续"}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

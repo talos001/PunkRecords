@@ -10,10 +10,30 @@
 - 时间：ISO 8601 字符串，时区建议 **明确为服务器本地或 UTC** 并在文档中写死。
 - 错误：统一 JSON 形如 `{ "error": { "code": "...", "message": "人类可读说明" } }`，HTTP 状态码 4xx/5xx。
 
-**认证（按需）**
+**认证（已启用）**
 
-- 若仅本机单用户：可先省略，或固定 token。
-- 若多用户/远程：建议 `Authorization: Bearer <token>`，下列接口在「需登录」小节标注。
+- 使用 JWT：`Authorization: Bearer <access_token>`。
+- 受保护接口在未登录时返回：
+  - HTTP `401`
+  - `{ "error": { "code": "AUTH_REQUIRED", "message": "请先登录" } }`
+- 已登录但未完成材料库路径确认时返回：
+  - HTTP `428`
+  - `{ "error": { "code": "MATERIALS_PATH_CONFIRM_REQUIRED", "message": "...", "details": { "effective_materials_path": "..." } } }`
+
+---
+
+## 0. 认证与启动信息
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| `POST` | `/api/v1/auth/register` | 注册并返回 token 对 |
+| `POST` | `/api/v1/auth/login` | 登录并返回 token 对 |
+| `POST` | `/api/v1/auth/refresh` | 用 refresh token 换新 token 对 |
+| `POST` | `/api/v1/auth/logout` | 使当前用户 token 版本失效 |
+| `GET` | `/api/v1/me/bootstrap` | 返回当前用户、材料路径确认状态与当前生效路径 |
+| `PUT` | `/api/v1/me/materials-path` | 确认默认路径或提交自定义路径并确认生效路径 |
+
+`POST /api/v1/chat`、`POST /api/v1/chat/stream`、`POST /api/v1/ingest`、`GET/PUT /api/v1/settings*` 均为受保护接口。
 
 ---
 
