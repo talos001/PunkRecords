@@ -155,7 +155,9 @@ class DomainStore:
         with self._lock:
             with self._connect() as conn:
                 if include_archived:
-                    rows = conn.execute("SELECT * FROM domains ORDER BY created_at ASC").fetchall()
+                    rows = conn.execute(
+                        "SELECT * FROM domains WHERE is_archived = 1 ORDER BY created_at ASC"
+                    ).fetchall()
                 else:
                     rows = conn.execute(
                         "SELECT * FROM domains WHERE is_archived = 0 ORDER BY created_at ASC"

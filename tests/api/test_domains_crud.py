@@ -15,7 +15,7 @@ def test_slug_generation_and_conflict_suffix_persisted(tmp_path: Path) -> None:
     assert d2.id == "math-basics-2"
 
     reloaded = DomainStore(db_path)
-    ids = [d.id for d in reloaded.list_domains(include_archived=True)]
+    ids = [d.id for d in reloaded.list_domains()]
     assert ids == ["math-basics", "math-basics-2"]
 
 
@@ -38,6 +38,22 @@ def test_archive_keeps_domain_readable(tmp_path: Path) -> None:
     fetched = store.get_domain(created.id)
     assert fetched is not None
     assert fetched.is_archived is True
+
+
+def test_list_domains_include_archived_switches_view(tmp_path: Path) -> None:
+    db_path = tmp_path / "domains.sqlite3"
+    store = DomainStore(db_path)
+    active = store.create_domain(name="Active Domain", description="A")
+    archived = store.create_domain(name="Archived Domain", description="B")
+    store.archive_domain(archived.id)
+
+    active_ids = [d.id for d in store.list_domains(include_archived=False)]
+    archived_ids = [d.id for d in store.list_domains(include_archived=True)]
+
+    assert active.id in active_ids
+    assert archived.id not in active_ids
+    assert archived.id in archived_ids
+    assert active.id not in archived_ids
 
 
 def test_domain_schema_supports_archive_contract() -> None:
