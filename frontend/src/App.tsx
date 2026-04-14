@@ -726,7 +726,7 @@ export function App() {
           <div className="sidebar-brand">
             <img
               className="brand-logo"
-              src="/punkrecords_logo.png"
+              src="/punkrecords_logo.svg"
               alt="PunkRecords 班克记录"
             />
           </div>

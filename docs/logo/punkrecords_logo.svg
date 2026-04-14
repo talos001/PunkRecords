@@ -1,0 +1,41 @@
+<svg width="640" height="240" viewBox="0 0 640 240" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- 主渐变 -->
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563EB"></stop>
+      <stop offset="100%" stop-color="#06B6D4"></stop>
+    </linearGradient>
+
+    <!-- 微光 -->
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#60A5FA" stop-opacity="0.35"></stop>
+      <stop offset="100%" stop-color="#60A5FA" stop-opacity="0"></stop>
+    </radialGradient>
+  </defs>
+
+  <!-- 左侧：抽象“知识大脑”（Vegapunk 风） -->
+  <g transform="translate(120,120)">
+
+    <!-- 外部微光 -->
+    <circle r="70" fill="url(#glow)"></circle>
+
+    <!-- 主体结构（更像“知识结构”，不是器官） -->
+    <circle r="48" fill="url(#grad)"></circle>
+
+    <!-- 内部“知识节点” -->
+    <circle cx="-18" cy="-10" r="4" fill="white"></circle>
+    <circle cx="16" cy="-8" r="4" fill="white"></circle>
+    <circle cx="0" cy="20" r="4" fill="white"></circle>
+
+    <!-- 连接（知识关系） -->
+    <line x1="-18" y1="-10" x2="16" y2="-8" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.9"></line>
+    <line x1="16" y1="-8" x2="0" y2="20" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.9"></line>
+    <line x1="0" y1="20" x2="-18" y2="-10" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.9"></line>
+
+  </g>
+
+  <!-- 右侧：品牌名（更大厂风） -->
+  <text x="240" y="130" font-family="Inter, SF Pro Display, Helvetica, Arial, sans-serif" font-size="46" font-weight="600" letter-spacing="0.4" fill="#0F172A">
+    PunkRecords
+  </text>
+</svg>

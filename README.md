@@ -1,6 +1,3 @@
-<p align="center">
-  <img src="docs/logo/punkrecords_logo.png" width="240" alt="PunkRecords Logo" />
-</p>
 <h3 align="center">PunkRecords · 班克记录</h3>
 <p align="center">
   <em>像贝加庞克一样</em>，将你的大脑外化为无限的智慧仓库。<br />
