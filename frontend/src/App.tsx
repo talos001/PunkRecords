@@ -25,6 +25,16 @@ import {
   updateDomain,
 } from "./api/domains";
 import {
+  fetchDomainSettings,
+  fetchLlmSettings,
+  patchDomainSettings,
+  patchLlmSettings,
+  type DomainSettings,
+  type LlmSettings,
+  type PatchDomainSettingsPayload,
+  type PatchLlmSettingsPayload,
+} from "./api/settings";
+import {
   PYTHAGORAS_BUBBLE_LABEL,
   PYTHAGORAS_THINKING,
 } from "./brand";
@@ -51,6 +61,14 @@ type ChatMessage = {
 
 type AuthState = "anonymous" | "authenticated_unconfigured" | "authenticated_ready";
 type PendingAction = "send" | "settings";
+type SettingsTab = "model" | "domain";
+
+type ModelDraft = {
+  llm_provider: string;
+  llm_model: string;
+  llm_base_url: string;
+  llm_api_key: string;
+};
 
 function uid(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -185,15 +203,6 @@ function IconHome() {
   );
 }
 
-function IconAgent() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <rect x="4" y="4" width="16" height="16" rx="2" />
-      <path d="M9 9h.01M15 9h.01M9 15c1.5 1 4.5 1 6 0" />
-    </svg>
-  );
-}
-
 function IconSettings() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -205,7 +214,6 @@ function IconSettings() {
 
 const NAV_ICONS: Record<SidebarNavId, ReactNode> = {
   home: <IconHome />,
-  agent: <IconAgent />,
   settings: <IconSettings />,
 };
 
@@ -243,8 +251,6 @@ export function App() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [creatingDomain, setCreatingDomain] = useState(false);
   const [domainMutating, setDomainMutating] = useState(false);
-  const [domainError, setDomainError] = useState("");
-  const [domainSuccess, setDomainSuccess] = useState("");
   const [newDomainName, setNewDomainName] = useState("");
   const [newDomainDescription, setNewDomainDescription] = useState("");
   const [newDomainEmoji, setNewDomainEmoji] = useState("📁");
@@ -252,8 +258,21 @@ export function App() {
   const [editingDomainName, setEditingDomainName] = useState("");
   const [editingDomainDescription, setEditingDomainDescription] = useState("");
   const [editingDomainEmoji, setEditingDomainEmoji] = useState("📁");
-  const [modelProfile, setModelProfile] = useState("balanced");
-  const [reasoningLevel, setReasoningLevel] = useState("standard");
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>("model");
+  const [settingsLoading, setSettingsLoading] = useState(false);
+  const [settingsError, setSettingsError] = useState("");
+  const [settingsSuccess, setSettingsSuccess] = useState("");
+  const [modelSaving, setModelSaving] = useState(false);
+  const [domainSaving, setDomainSaving] = useState(false);
+  const [modelSnapshot, setModelSnapshot] = useState<LlmSettings | null>(null);
+  const [domainSnapshot, setDomainSnapshot] = useState<DomainSettings | null>(null);
+  const [modelDraft, setModelDraft] = useState<ModelDraft>({
+    llm_provider: "fake",
+    llm_model: "",
+    llm_base_url: "",
+    llm_api_key: "",
+  });
+  const [globalMaterialsPath, setGlobalMaterialsPath] = useState("");
   const messagesRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -316,6 +335,50 @@ export function App() {
           setRefreshToken(null);
           return;
         }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken]);
+
+  useEffect(() => {
+    if (!accessToken) return;
+    let cancelled = false;
+    setSettingsLoading(true);
+    setSettingsError("");
+    const loadFromServer = useLiveApi
+      ? Promise.all([
+          fetchLlmSettings({ baseUrl: API_BASE_URL, accessToken }),
+          fetchDomainSettings({ baseUrl: API_BASE_URL, accessToken }),
+        ])
+      : Promise.resolve<[LlmSettings, DomainSettings]>([
+          {
+            llm_provider: "fake",
+            llm_model: "",
+            llm_base_url: "",
+            masked_llm_api_key: "",
+          },
+          { materials_vault_path: "", domain_material_paths: {} },
+        ]);
+    loadFromServer
+      .then(([llmData, domainData]) => {
+        if (cancelled) return;
+        setModelSnapshot(llmData);
+        setDomainSnapshot(domainData);
+        setModelDraft({
+          llm_provider: llmData.llm_provider ?? "fake",
+          llm_model: llmData.llm_model ?? "",
+          llm_base_url: llmData.llm_base_url ?? "",
+          llm_api_key: "",
+        });
+        setGlobalMaterialsPath(domainData.materials_vault_path ?? "");
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setSettingsError(e instanceof Error ? e.message : "加载设置失败");
+      })
+      .finally(() => {
+        if (!cancelled) setSettingsLoading(false);
       });
     return () => {
       cancelled = true;
@@ -707,12 +770,108 @@ export function App() {
   const hasMessages = messages.length > 0;
   const timeGreeting = useMemo(() => getTimeGreeting(), []);
   const isHomeView = navActive === "home";
-  const mainTopbarTitle =
-    navActive === "agent"
-      ? "模型配置"
-      : navActive === "settings"
-        ? "领域管理"
-        : "班克记录";
+  const mainTopbarTitle = navActive === "settings" ? "设置" : "班克记录";
+  const modelDirty = useMemo(() => {
+    if (!modelSnapshot) return false;
+    return (
+      modelDraft.llm_provider !== (modelSnapshot.llm_provider ?? "fake") ||
+      modelDraft.llm_model !== (modelSnapshot.llm_model ?? "") ||
+      modelDraft.llm_base_url !== (modelSnapshot.llm_base_url ?? "") ||
+      modelDraft.llm_api_key.trim().length > 0
+    );
+  }, [modelDraft, modelSnapshot]);
+  const domainPathDirty = useMemo(
+    () => globalMaterialsPath.trim() !== (domainSnapshot?.materials_vault_path ?? ""),
+    [globalMaterialsPath, domainSnapshot],
+  );
+
+  const updateModelSnapshot = useCallback((next: LlmSettings) => {
+    setModelSnapshot(next);
+    setModelDraft((prev) => ({
+      llm_provider: next.llm_provider ?? prev.llm_provider,
+      llm_model: next.llm_model ?? prev.llm_model,
+      llm_base_url: next.llm_base_url ?? prev.llm_base_url,
+      llm_api_key: "",
+    }));
+  }, []);
+
+  const updateDomainSnapshot = useCallback((next: DomainSettings) => {
+    setDomainSnapshot(next);
+    setGlobalMaterialsPath(next.materials_vault_path ?? "");
+  }, []);
+
+  const saveModelSettings = useCallback(async () => {
+    if (!accessToken) return;
+    if (!modelDraft.llm_provider.trim() || !modelDraft.llm_model.trim()) {
+      setSettingsError("Provider 与模型名称为必填项");
+      return;
+    }
+    if (
+      modelDraft.llm_base_url.trim() &&
+      !/^https?:\/\/.+/i.test(modelDraft.llm_base_url.trim())
+    ) {
+      setSettingsError("Base URL 需为合法 http(s) 地址");
+      return;
+    }
+    const body: PatchLlmSettingsPayload = {
+      llm_provider: modelDraft.llm_provider.trim(),
+      llm_model: modelDraft.llm_model.trim(),
+      llm_base_url: modelDraft.llm_base_url.trim(),
+    };
+    if (modelDraft.llm_api_key.trim()) body.llm_api_key = modelDraft.llm_api_key.trim();
+    setModelSaving(true);
+    setSettingsError("");
+    setSettingsSuccess("");
+    try {
+      if (useLiveApi) {
+        const next = await patchLlmSettings({ baseUrl: API_BASE_URL, accessToken, body });
+        updateModelSnapshot(next);
+      } else {
+        updateModelSnapshot({
+          llm_provider: body.llm_provider ?? modelDraft.llm_provider,
+          llm_model: body.llm_model ?? modelDraft.llm_model,
+          llm_base_url: body.llm_base_url ?? modelDraft.llm_base_url,
+          masked_llm_api_key: modelDraft.llm_api_key ? "********" : modelSnapshot?.masked_llm_api_key ?? "",
+        });
+      }
+      setSettingsSuccess("模型配置已保存。");
+    } catch (e) {
+      setSettingsError(e instanceof Error ? e.message : "模型配置保存失败");
+    } finally {
+      setModelSaving(false);
+    }
+  }, [accessToken, modelDraft, modelSnapshot, updateModelSnapshot]);
+
+  const saveDomainPathSettings = useCallback(async () => {
+    if (!accessToken) return;
+    const body: PatchDomainSettingsPayload = {
+      materials_vault_path: globalMaterialsPath.trim(),
+    };
+    setDomainSaving(true);
+    setSettingsError("");
+    setSettingsSuccess("");
+    try {
+      if (useLiveApi) {
+        const next = await patchDomainSettings({ baseUrl: API_BASE_URL, accessToken, body });
+        updateDomainSnapshot(next);
+      } else {
+        updateDomainSnapshot({
+          materials_vault_path: body.materials_vault_path ?? "",
+          domain_material_paths: domainSnapshot?.domain_material_paths ?? {},
+        });
+      }
+      setSettingsSuccess("领域管理与路径配置已保存。");
+    } catch (e) {
+      setSettingsError(e instanceof Error ? e.message : "路径配置保存失败");
+    } finally {
+      setDomainSaving(false);
+    }
+  }, [
+    accessToken,
+    globalMaterialsPath,
+    domainSnapshot,
+    updateDomainSnapshot,
+  ]);
 
   return (
     <div className="app">
@@ -789,22 +948,12 @@ export function App() {
                     type="button"
                     className="sidebar-user-menu-item"
                     onClick={() => {
-                      setNavActive("agent");
-                      setUserMenuOpen(false);
-                    }}
-                  >
-                    模型配置
-                  </button>
-                  <button
-                    type="button"
-                    className="sidebar-user-menu-item"
-                    onClick={() => {
                       if (!ensureReady("settings")) return;
                       setNavActive("settings");
                       setUserMenuOpen(false);
                     }}
                   >
-                    领域管理
+                    设置
                   </button>
                   <button
                     type="button"
@@ -878,80 +1027,10 @@ export function App() {
               </>
             )}
 
-            {navActive === "agent" && (
-              <section className="model-config" aria-label="模型配置">
-                <div className="domain-manager-header">
-                  <h3>模型配置</h3>
-                  <button
-                    type="button"
-                    className="domain-manager-back"
-                    onClick={() => setNavActive("home")}
-                  >
-                    返回主页
-                  </button>
-                </div>
-                <p className="domain-manager-hint">
-                  这里用于切换对话模型策略，后续可与后端配置联动。
-                </p>
-                <div className="model-config-group">
-                  <strong>模型档位</strong>
-                  <div className="model-config-options">
-                    <button
-                      type="button"
-                      className={`model-config-option${modelProfile === "fast" ? " model-config-option--active" : ""}`}
-                      onClick={() => setModelProfile("fast")}
-                    >
-                      快速
-                    </button>
-                    <button
-                      type="button"
-                      className={`model-config-option${modelProfile === "balanced" ? " model-config-option--active" : ""}`}
-                      onClick={() => setModelProfile("balanced")}
-                    >
-                      均衡
-                    </button>
-                    <button
-                      type="button"
-                      className={`model-config-option${modelProfile === "quality" ? " model-config-option--active" : ""}`}
-                      onClick={() => setModelProfile("quality")}
-                    >
-                      高质量
-                    </button>
-                  </div>
-                </div>
-                <div className="model-config-group">
-                  <strong>推理强度</strong>
-                  <div className="model-config-options">
-                    <button
-                      type="button"
-                      className={`model-config-option${reasoningLevel === "light" ? " model-config-option--active" : ""}`}
-                      onClick={() => setReasoningLevel("light")}
-                    >
-                      轻量
-                    </button>
-                    <button
-                      type="button"
-                      className={`model-config-option${reasoningLevel === "standard" ? " model-config-option--active" : ""}`}
-                      onClick={() => setReasoningLevel("standard")}
-                    >
-                      标准
-                    </button>
-                    <button
-                      type="button"
-                      className={`model-config-option${reasoningLevel === "deep" ? " model-config-option--active" : ""}`}
-                      onClick={() => setReasoningLevel("deep")}
-                    >
-                      深度
-                    </button>
-                  </div>
-                </div>
-              </section>
-            )}
-
             {navActive === "settings" && (
-              <section className="domain-manager" aria-label="领域管理">
+              <section className="domain-manager settings-panel" aria-label="设置">
                 <div className="domain-manager-header">
-                  <h3>领域管理</h3>
+                  <h3>设置</h3>
                   <button
                     type="button"
                     className="domain-manager-back"
@@ -960,13 +1039,151 @@ export function App() {
                     返回主页
                   </button>
                 </div>
-                <p className="domain-manager-hint">
-                  支持新增、编辑与归档。归档保留记录；若领域含材料或索引数据会被保护，无法归档。
-                </p>
-                {domainError && <p className="domain-manager-error">{domainError}</p>}
-                {domainSuccess && (
-                  <p className="domain-manager-success">{domainSuccess}</p>
+                <div className="settings-tabs" role="tablist" aria-label="设置标签">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={settingsTab === "model"}
+                    className={`settings-tab${settingsTab === "model" ? " settings-tab--active" : ""}`}
+                    onClick={() => {
+                      setSettingsTab("model");
+                      setSettingsError("");
+                      setSettingsSuccess("");
+                    }}
+                  >
+                    模型配置
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={settingsTab === "domain"}
+                    className={`settings-tab${settingsTab === "domain" ? " settings-tab--active" : ""}`}
+                    onClick={() => {
+                      setSettingsTab("domain");
+                      setSettingsError("");
+                      setSettingsSuccess("");
+                    }}
+                  >
+                    领域管理
+                  </button>
+                </div>
+                {settingsError && <p className="domain-manager-error">{settingsError}</p>}
+                {settingsSuccess && (
+                  <p className="domain-manager-success">{settingsSuccess}</p>
                 )}
+                {settingsLoading && <p className="domain-manager-hint">设置加载中...</p>}
+
+                {settingsTab === "model" && (
+                  <div className="settings-card">
+                    <p className="domain-manager-hint">
+                      在此配置模型 Provider、模型名称和访问地址。密钥留空表示不变更。
+                    </p>
+                    <div className="domain-form-grid">
+                      <label className="settings-field">
+                        <span>Provider</span>
+                        <select
+                          className="domain-input settings-provider-input"
+                          value={modelDraft.llm_provider}
+                          onChange={(e) =>
+                            setModelDraft((prev) => ({ ...prev, llm_provider: e.target.value }))
+                          }
+                        >
+                          {["fake", "anthropic", "openai", "ollama"].map((provider) => (
+                            <option key={provider} value={provider}>
+                              {provider}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="settings-field">
+                        <span>模型名称</span>
+                        <input
+                          className="domain-input settings-model-input"
+                          placeholder="如 claude-3-5-sonnet"
+                          value={modelDraft.llm_model}
+                          onChange={(e) =>
+                            setModelDraft((prev) => ({ ...prev, llm_model: e.target.value }))
+                          }
+                        />
+                      </label>
+                      <label className="settings-field domain-input--full">
+                        <span>Base URL（可选）</span>
+                        <input
+                          className="domain-input"
+                          placeholder="https://api.example.com/v1"
+                          value={modelDraft.llm_base_url}
+                          onChange={(e) =>
+                            setModelDraft((prev) => ({ ...prev, llm_base_url: e.target.value }))
+                          }
+                        />
+                      </label>
+                      <label className="settings-field domain-input--full">
+                        <span>API Key（可选）</span>
+                        <input
+                          className="domain-input"
+                          type="password"
+                          placeholder={
+                            modelSnapshot?.masked_llm_api_key
+                              ? "已配置，留空表示不修改"
+                              : "输入后保存"
+                          }
+                          value={modelDraft.llm_api_key}
+                          onChange={(e) =>
+                            setModelDraft((prev) => ({ ...prev, llm_api_key: e.target.value }))
+                          }
+                        />
+                      </label>
+                    </div>
+                    <div className="domain-action-row">
+                      <button
+                        type="button"
+                        className="domain-action-primary"
+                        disabled={modelSaving || !modelDirty}
+                        onClick={() => void saveModelSettings()}
+                      >
+                        {modelSaving ? "保存中..." : "保存模型配置"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {settingsTab === "domain" && (
+                  <>
+                    <div className="settings-card">
+                      <p className="domain-manager-hint">
+                        全局路径为默认材料库位置。领域路径由后端根据全局路径自动生成，此处仅回显。
+                      </p>
+                      <label className="settings-field domain-input--full">
+                        <span>全局材料库路径</span>
+                        <input
+                          className="domain-input"
+                          placeholder="如 /data/punkrecords/materials"
+                          value={globalMaterialsPath}
+                          onChange={(e) => setGlobalMaterialsPath(e.target.value)}
+                        />
+                      </label>
+                    </div>
+                    <div className="settings-card">
+                      <div className="domain-form-header">
+                        <strong>各领域路径覆盖</strong>
+                      </div>
+                      <div className="domain-path-list">
+                        {domainsList.map((d) => (
+                          <label key={d.id} className="domain-path-row">
+                            <span className="domain-path-label">
+                              <span>{d.emoji}</span>
+                              <span>{d.name}</span>
+                              {d.status === "archived" && (
+                                <span className="domain-path-tag">已归档</span>
+                              )}
+                            </span>
+                            <span className="domain-path-value">
+                              {(domainSnapshot?.domain_material_paths ?? {})[d.id] ?? "未生成"}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
 
                 <form
                   className="domain-form"
@@ -975,8 +1192,8 @@ export function App() {
                     if (!ensureReady("settings")) return;
                     if (!accessToken || !newDomainName.trim()) return;
                     setDomainMutating(true);
-                    setDomainError("");
-                    setDomainSuccess("");
+                    setSettingsError("");
+                    setSettingsSuccess("");
                     void createDomain({
                       baseUrl: API_BASE_URL,
                       accessToken,
@@ -1002,10 +1219,10 @@ export function App() {
                         setNewDomainDescription("");
                         setNewDomainEmoji("📁");
                         setCreatingDomain(false);
-                        setDomainSuccess("领域已创建并选中。");
+                        setSettingsSuccess("领域已创建并选中。");
                       })
                       .catch((e: unknown) => {
-                        setDomainError(
+                        setSettingsError(
                           e instanceof Error ? e.message : "新增领域失败",
                         );
                       })
@@ -1107,8 +1324,8 @@ export function App() {
                           if (!ensureReady("settings")) return;
                           if (!accessToken || !editingDomainId) return;
                           setDomainMutating(true);
-                          setDomainError("");
-                          setDomainSuccess("");
+                          setSettingsError("");
+                          setSettingsSuccess("");
                           void updateDomain({
                             baseUrl: API_BASE_URL,
                             accessToken,
@@ -1121,10 +1338,10 @@ export function App() {
                           })
                             .then(() => refreshDomains(editingDomainId))
                             .then(() => {
-                              setDomainSuccess("领域基础信息已更新。");
+                              setSettingsSuccess("领域基础信息已更新。");
                             })
                             .catch((e: unknown) => {
-                              setDomainError(
+                              setSettingsError(
                                 e instanceof Error ? e.message : "更新领域失败",
                               );
                             })
@@ -1143,8 +1360,8 @@ export function App() {
                           if (!ensureReady("settings")) return;
                           if (!accessToken || !editingDomainId) return;
                           setDomainMutating(true);
-                          setDomainError("");
-                          setDomainSuccess("");
+                          setSettingsError("");
+                          setSettingsSuccess("");
                           void deleteDomain({
                             baseUrl: API_BASE_URL,
                             accessToken,
@@ -1152,7 +1369,7 @@ export function App() {
                           })
                             .then(async () => {
                               await refreshDomains();
-                              setDomainSuccess("领域已删除。");
+                              setSettingsSuccess("领域已删除。");
                             })
                             .catch(async (e: unknown) => {
                               if (
@@ -1167,7 +1384,7 @@ export function App() {
                                   body: { status: "archived" },
                                 });
                                 await refreshDomains();
-                                setDomainSuccess(
+                                setSettingsSuccess(
                                   "领域包含内容，已自动改为归档状态。",
                                 );
                                 return;
@@ -1175,7 +1392,7 @@ export function App() {
                               throw e;
                             })
                             .catch((e: unknown) => {
-                              setDomainError(
+                              setSettingsError(
                                 e instanceof Error ? e.message : "归档领域失败",
                               );
                             })
@@ -1189,6 +1406,18 @@ export function App() {
                     </div>
                   </div>
                 </div>
+                <div className="domain-action-row">
+                  <button
+                    type="button"
+                    className="domain-action-primary"
+                    disabled={domainSaving || !domainPathDirty}
+                    onClick={() => void saveDomainPathSettings()}
+                  >
+                    {domainSaving ? "保存中..." : "保存领域与路径配置"}
+                  </button>
+                </div>
+                  </>
+                )}
               </section>
             )}
 

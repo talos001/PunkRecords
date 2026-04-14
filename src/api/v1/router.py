@@ -50,6 +50,11 @@ from ..schemas import (
     MaterialsPathResponse,
     SettingsAgentBody,
     SettingsAgentResponse,
+    SettingsDomainsPatchBody,
+    SettingsDomainsResponse,
+    SettingsLlmPatchBody,
+    SettingsLlmResponse,
+    SettingsPatchBody,
     SettingsResponse,
     VersionResponse,
 )
@@ -88,6 +93,27 @@ def _ensure_writable_dir(path_raw: str) -> None:
     probe = p / ".punkrecords-write-probe"
     probe.write_text("ok", encoding="utf-8")
     probe.unlink(missing_ok=True)
+
+
+def _mask_secret(secret: str) -> str:
+    if not secret:
+        return ""
+    if len(secret) <= 8:
+        return "*" * len(secret)
+    return f"{secret[:2]}***{secret[-2:]}"
+
+
+def _effective_domain_material_paths(
+    request: Request, user_materials_path: str | None, stored: dict[str, str]
+) -> dict[str, str]:
+    base = Path(_effective_materials_path(request, user_materials_path))
+    out: dict[str, str] = {}
+    for dom in domains_response().get("domains", []):
+        domain_id = str(dom.get("id") or "").strip()
+        if not domain_id:
+            continue
+        out[domain_id] = stored.get(domain_id) or str((base / domain_id).resolve())
+    return out
 
 
 def _require_active_domain(domain_id: str) -> dict:
@@ -203,11 +229,13 @@ def put_materials_path(request: Request, body: MaterialsPathBody) -> MaterialsPa
 
 @router.get("/health")
 def health() -> dict:
+    # NOTE: 当前 Web 前端未使用（主要供运维探活与脚本调用）
     return {"ok": True}
 
 
 @router.get("/version", response_model=VersionResponse)
 def version() -> VersionResponse:
+    # NOTE: 当前 Web 前端未使用（主要供诊断/脚本查询）
     return VersionResponse(version=PKG_VERSION)
 
 
@@ -392,6 +420,7 @@ async def chat_stream(
 
 @router.get("/agents", response_model=AgentsResponse)
 def list_agents() -> AgentsResponse:
+    # NOTE: 当前 Web 前端未使用（保留给 Agent 切换扩展）
     agents = [
         AgentOut(
             id=a.id,
@@ -406,12 +435,14 @@ def list_agents() -> AgentsResponse:
 
 @router.get("/settings/agent", response_model=SettingsAgentResponse)
 def get_settings_agent(request: Request) -> SettingsAgentResponse:
+    # NOTE: 当前 Web 前端未使用（保留给 Agent 设定扩展）
     require_ready_user(request)
     return SettingsAgentResponse(agent_id=get_current_agent_id())
 
 
 @router.put("/settings/agent", response_model=SettingsAgentResponse)
 def put_settings_agent(request: Request, body: SettingsAgentBody) -> SettingsAgentResponse:
+    # NOTE: 当前 Web 前端未使用（保留给 Agent 设定扩展）
     require_ready_user(request)
     if get_agent_meta(body.agent_id) is None:
         raise HTTPException(status_code=400, detail="未知 agent_id")
@@ -421,17 +452,182 @@ def put_settings_agent(request: Request, body: SettingsAgentBody) -> SettingsAge
 
 @router.get("/settings", response_model=SettingsResponse)
 def get_settings(request: Request) -> SettingsResponse:
-    require_ready_user(request)
+    # DEPRECATED: 已由 /settings/llm 与 /settings/domains 拆分替代；前端不再调用
+    ctx = require_ready_user(request)
     return SettingsResponse(
         default_domain_id=DEFAULT_DOMAIN_ID,
         theme="light",
         language="zh-CN",
+        llm_provider=ctx.user.llm_provider or "fake",
+        llm_model=ctx.user.llm_model or "",
+        llm_base_url=ctx.user.llm_base_url or "",
+        masked_llm_api_key=_mask_secret(ctx.user.llm_api_key or ""),
+        materials_vault_path=_effective_materials_path(request, ctx.user.materials_path),
+        domain_material_paths=ctx.user.domain_material_paths or {},
+    )
+
+
+@router.get("/settings/llm", response_model=SettingsLlmResponse)
+def get_settings_llm(request: Request) -> SettingsLlmResponse:
+    ctx = require_ready_user(request)
+    return SettingsLlmResponse(
+        llm_provider=ctx.user.llm_provider or "fake",
+        llm_model=ctx.user.llm_model or "",
+        llm_base_url=ctx.user.llm_base_url or "",
+        masked_llm_api_key=_mask_secret(ctx.user.llm_api_key or ""),
+    )
+
+
+@router.get("/settings/domains", response_model=SettingsDomainsResponse)
+def get_settings_domains(request: Request) -> SettingsDomainsResponse:
+    ctx = require_ready_user(request)
+    return SettingsDomainsResponse(
+        materials_vault_path=_effective_materials_path(request, ctx.user.materials_path),
+        domain_material_paths=_effective_domain_material_paths(
+            request, ctx.user.materials_path, ctx.user.domain_material_paths or {}
+        ),
+    )
+
+
+@router.patch("/settings/llm", response_model=SettingsLlmResponse)
+def patch_settings_llm(request: Request, body: SettingsLlmPatchBody) -> SettingsLlmResponse:
+    ctx = require_ready_user(request)
+    store: AuthStore = request.app.state.auth_store
+    provider = body.llm_provider.strip() if body.llm_provider is not None else None
+    model = body.llm_model.strip() if body.llm_model is not None else None
+    base_url = body.llm_base_url.strip() if body.llm_base_url is not None else None
+    api_key = body.llm_api_key.strip() if body.llm_api_key is not None else None
+    updated = store.update_user_settings(
+        ctx.user.id,
+        llm_provider=provider,
+        llm_model=model,
+        llm_base_url=base_url,
+        llm_api_key=api_key if api_key is not None and api_key != "" else None,
+    )
+    return SettingsLlmResponse(
+        llm_provider=updated.llm_provider or "fake",
+        llm_model=updated.llm_model or "",
+        llm_base_url=updated.llm_base_url or "",
+        masked_llm_api_key=_mask_secret(updated.llm_api_key or ""),
+    )
+
+
+@router.patch("/settings/domains", response_model=SettingsDomainsResponse)
+def patch_settings_domains(
+    request: Request, body: SettingsDomainsPatchBody
+) -> SettingsDomainsResponse:
+    ctx = require_ready_user(request)
+    store: AuthStore = request.app.state.auth_store
+    cfg = request.app.state.config
+    materials_path: str | None = None
+    update_materials = False
+    if body.materials_vault_path is not None:
+        update_materials = True
+        p = body.materials_vault_path.strip()
+        if p:
+            resolved = _resolve_custom_path(p)
+            try:
+                _ensure_writable_dir(resolved)
+            except Exception as e:
+                raise ApiError(400, "INVALID_PATH", f"路径不可写：{resolved}") from e
+            materials_path = resolved
+        else:
+            materials_path = None
+    if body.domain_material_paths is not None:
+        raise ApiError(
+            400,
+            "UNSUPPORTED_FIELD",
+            "domain_material_paths 不支持前端直接修改，仅用于回显",
+        )
+    updated = store.update_user_settings(
+        ctx.user.id,
+        materials_path=materials_path,
+        update_materials_path=update_materials,
+        # 全局路径变化后由后端自动重算领域路径，用户侧不再维护覆盖值。
+        domain_material_paths={}
+        if update_materials
+        else (ctx.user.domain_material_paths or {}),
+    )
+    effective = updated.materials_path or str(cfg.materials_vault_path)
+    return SettingsDomainsResponse(
+        materials_vault_path=effective,
+        domain_material_paths=_effective_domain_material_paths(
+            request, updated.materials_path, updated.domain_material_paths or {}
+        ),
+    )
+
+
+@router.patch("/settings", response_model=SettingsResponse)
+def patch_settings(request: Request, body: SettingsPatchBody) -> SettingsResponse:
+    # DEPRECATED: 已由 /settings/llm 与 /settings/domains 拆分替代；前端不再调用
+    ctx = require_ready_user(request)
+    store: AuthStore = request.app.state.auth_store
+    cfg = request.app.state.config
+
+    provider = body.llm_provider.strip() if body.llm_provider is not None else None
+    model = body.llm_model.strip() if body.llm_model is not None else None
+    base_url = body.llm_base_url.strip() if body.llm_base_url is not None else None
+    api_key = body.llm_api_key.strip() if body.llm_api_key is not None else None
+
+    materials_path: str | None = None
+    update_materials = False
+    if body.materials_vault_path is not None:
+        update_materials = True
+        p = body.materials_vault_path.strip()
+        if p:
+            resolved = _resolve_custom_path(p)
+            try:
+                _ensure_writable_dir(resolved)
+            except Exception as e:
+                raise ApiError(400, "INVALID_PATH", f"路径不可写：{resolved}") from e
+            materials_path = resolved
+        else:
+            materials_path = None
+
+    domain_paths: dict[str, str] | None = None
+    if body.domain_material_paths is not None:
+        domain_paths = {}
+        for domain_id, raw in body.domain_material_paths.items():
+            if not domain_exists(domain_id):
+                raise ApiError(400, "INVALID_DOMAIN", f"未知领域：{domain_id}")
+            val = (raw or "").strip()
+            if not val:
+                continue
+            resolved = _resolve_custom_path(val)
+            try:
+                _ensure_writable_dir(resolved)
+            except Exception as e:
+                raise ApiError(400, "INVALID_PATH", f"路径不可写：{resolved}") from e
+            domain_paths[domain_id] = resolved
+
+    updated = store.update_user_settings(
+        ctx.user.id,
+        llm_provider=provider,
+        llm_model=model,
+        llm_base_url=base_url,
+        llm_api_key=api_key if api_key is not None and api_key != "" else None,
+        materials_path=materials_path,
+        update_materials_path=update_materials,
+        domain_material_paths=domain_paths,
+    )
+    effective = updated.materials_path or str(cfg.materials_vault_path)
+    return SettingsResponse(
+        default_domain_id=DEFAULT_DOMAIN_ID,
+        theme="light",
+        language="zh-CN",
+        llm_provider=updated.llm_provider or "fake",
+        llm_model=updated.llm_model or "",
+        llm_base_url=updated.llm_base_url or "",
+        masked_llm_api_key=_mask_secret(updated.llm_api_key or ""),
+        materials_vault_path=effective,
+        domain_material_paths=updated.domain_material_paths or {},
     )
 
 
 @router.post("/ingest", response_model=IngestResponse)
 def post_ingest(request: Request, body: IngestBody) -> IngestResponse:
     """将材料 Vault 内单个文件摄取到指定领域的索引 Vault（与 CLI ``ingest`` 等价）。"""
+    # NOTE: 当前 Web 前端未直接调用（保留给手工/脚本 ingest）
     require_ready_user(request)
     _require_active_domain(body.domain_id)
     cfg = request.app.state.config

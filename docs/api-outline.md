@@ -252,10 +252,17 @@
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| `GET` | `/api/v1/settings` | 语言、主题、默认领域覆盖、Obsidian 路径提示等（**勿**把敏感路径暴露给未授权客户端） |
-| `PATCH` | `/api/v1/settings` | 部分更新 |
+| `GET` | `/api/v1/settings/llm` | 返回模型设置：`llm_provider`、`llm_model`、`llm_base_url`、`masked_llm_api_key` |
+| `PATCH` | `/api/v1/settings/llm` | 更新模型设置：`llm_provider`、`llm_model`、`llm_base_url`、`llm_api_key` |
+| `GET` | `/api/v1/settings/domains` | 返回领域路径设置：`materials_vault_path`、`domain_material_paths` |
+| `PATCH` | `/api/v1/settings/domains` | 更新领域路径设置：`materials_vault_path`、`domain_material_paths` |
 
-本地单机场景下，部分项可只写本地配置文件，不暴露 HTTP。
+说明：
+
+- `masked_llm_api_key` 仅用于前端展示“已配置”状态，不返回明文密钥；
+- `materials_vault_path` 为空时表示使用服务端全局默认路径；
+- `domain_material_paths` 中未出现的领域视为继承全局路径；
+- 受保护接口：未登录或未完成首登路径确认时不可调用。
 
 ---
 
@@ -285,3 +292,22 @@
 | 2026-04-13 | 新增 `POST /auth/reset-password`，用于本地开发场景下按用户名重置密码 |
 | 2026-04-13 | 更新 ingest 文档契约：`domain_index_paths` 显式映射优先，未命中时走默认 fallback 索引目录 |
 | 2026-04-13 | 新增 domains CRUD 轮廓、领域接口错误码与路径 fallback 语义（含 409 冲突约定） |
+| 2026-04-14 | 设置接口拆分：`/settings/llm` 与 `/settings/domains` 分离模型参数与领域路径配置 |
+
+---
+
+## 11. 当前前端未使用接口（已标注）
+
+以下接口在后端仍保留，但当前 Web 前端未直接调用：
+
+- `GET /api/v1/health`
+- `GET /api/v1/version`
+- `GET /api/v1/agents`
+- `GET /api/v1/settings/agent`
+- `PUT /api/v1/settings/agent`
+- `POST /api/v1/ingest`
+
+另外，以下聚合设置接口已标记为 **DEPRECATED**（前端不再使用）：
+
+- `GET /api/v1/settings`
+- `PATCH /api/v1/settings`

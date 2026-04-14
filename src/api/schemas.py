@@ -82,6 +82,45 @@ class SettingsResponse(BaseModel):
     default_domain_id: Optional[str] = None
     theme: str = "light"
     language: str = "zh-CN"
+    llm_provider: str = "fake"
+    llm_model: str = ""
+    llm_base_url: str = ""
+    masked_llm_api_key: str = ""
+    materials_vault_path: str = ""
+    domain_material_paths: dict[str, str] = Field(default_factory=dict)
+
+
+class SettingsPatchBody(BaseModel):
+    llm_provider: Optional[str] = None
+    llm_model: Optional[str] = None
+    llm_base_url: Optional[str] = None
+    llm_api_key: Optional[str] = None
+    materials_vault_path: Optional[str] = None
+    domain_material_paths: Optional[dict[str, str]] = None
+
+
+class SettingsLlmResponse(BaseModel):
+    llm_provider: str = "fake"
+    llm_model: str = ""
+    llm_base_url: str = ""
+    masked_llm_api_key: str = ""
+
+
+class SettingsLlmPatchBody(BaseModel):
+    llm_provider: Optional[str] = None
+    llm_model: Optional[str] = None
+    llm_base_url: Optional[str] = None
+    llm_api_key: Optional[str] = None
+
+
+class SettingsDomainsResponse(BaseModel):
+    materials_vault_path: str = ""
+    domain_material_paths: dict[str, str] = Field(default_factory=dict)
+
+
+class SettingsDomainsPatchBody(BaseModel):
+    materials_vault_path: Optional[str] = None
+    domain_material_paths: Optional[dict[str, str]] = None
 
 
 class AuthLoginBody(BaseModel):

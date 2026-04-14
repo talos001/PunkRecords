@@ -38,6 +38,11 @@ class UserRecord:
     token_version: int
     materials_path: str | None
     materials_path_confirmed: bool
+    llm_provider: str
+    llm_model: str
+    llm_base_url: str
+    llm_api_key: str
+    domain_material_paths: dict[str, str]
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -48,6 +53,11 @@ class UserRecord:
             "token_version": self.token_version,
             "materials_path": self.materials_path,
             "materials_path_confirmed": self.materials_path_confirmed,
+            "llm_provider": self.llm_provider,
+            "llm_model": self.llm_model,
+            "llm_base_url": self.llm_base_url,
+            "llm_api_key": "***" if self.llm_api_key else "",
+            "domain_material_paths": self.domain_material_paths,
         }
 
 
@@ -75,15 +85,57 @@ class AuthStore:
                     password_hash TEXT NOT NULL,
                     token_version INTEGER NOT NULL DEFAULT 0,
                     materials_path TEXT,
-                    materials_path_confirmed INTEGER NOT NULL DEFAULT 0
+                    materials_path_confirmed INTEGER NOT NULL DEFAULT 0,
+                    llm_provider TEXT NOT NULL DEFAULT 'fake',
+                    llm_model TEXT NOT NULL DEFAULT '',
+                    llm_base_url TEXT NOT NULL DEFAULT '',
+                    llm_api_key TEXT NOT NULL DEFAULT '',
+                    domain_material_paths TEXT NOT NULL DEFAULT '{}'
                 )
                 """
             )
+            cols = {
+                row["name"]
+                for row in conn.execute("PRAGMA table_info(users)").fetchall()
+            }
+            migrations = [
+                (
+                    "llm_provider",
+                    "ALTER TABLE users ADD COLUMN llm_provider TEXT NOT NULL DEFAULT 'fake'",
+                ),
+                (
+                    "llm_model",
+                    "ALTER TABLE users ADD COLUMN llm_model TEXT NOT NULL DEFAULT ''",
+                ),
+                (
+                    "llm_base_url",
+                    "ALTER TABLE users ADD COLUMN llm_base_url TEXT NOT NULL DEFAULT ''",
+                ),
+                (
+                    "llm_api_key",
+                    "ALTER TABLE users ADD COLUMN llm_api_key TEXT NOT NULL DEFAULT ''",
+                ),
+                (
+                    "domain_material_paths",
+                    "ALTER TABLE users ADD COLUMN domain_material_paths TEXT NOT NULL DEFAULT '{}'",
+                ),
+            ]
+            for col, stmt in migrations:
+                if col not in cols:
+                    conn.execute(stmt)
             conn.commit()
 
     def _from_row(self, row: sqlite3.Row | None) -> UserRecord | None:
         if row is None:
             return None
+        raw_domain_paths = row["domain_material_paths"] if "domain_material_paths" in row.keys() else "{}"
+        try:
+            parsed = json.loads(raw_domain_paths or "{}")
+            domain_paths = (
+                {str(k): str(v) for k, v in parsed.items()} if isinstance(parsed, dict) else {}
+            )
+        except Exception:
+            domain_paths = {}
         return UserRecord(
             id=str(row["id"]),
             username=str(row["username"]),
@@ -92,6 +144,11 @@ class AuthStore:
             token_version=int(row["token_version"]),
             materials_path=row["materials_path"],
             materials_path_confirmed=bool(row["materials_path_confirmed"]),
+            llm_provider=str(row["llm_provider"] if "llm_provider" in row.keys() else "fake"),
+            llm_model=str(row["llm_model"] if "llm_model" in row.keys() else ""),
+            llm_base_url=str(row["llm_base_url"] if "llm_base_url" in row.keys() else ""),
+            llm_api_key=str(row["llm_api_key"] if "llm_api_key" in row.keys() else ""),
+            domain_material_paths=domain_paths,
         )
 
     def _migrate_from_json_if_needed(self) -> None:
@@ -152,14 +209,20 @@ class AuthStore:
                 token_version=0,
                 materials_path=None,
                 materials_path_confirmed=False,
+                llm_provider="fake",
+                llm_model="",
+                llm_base_url="",
+                llm_api_key="",
+                domain_material_paths={},
             )
             with self._connect() as conn:
                 conn.execute(
                     """
                     INSERT INTO users (
                         id, username, password_salt, password_hash, token_version,
-                        materials_path, materials_path_confirmed
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                        materials_path, materials_path_confirmed,
+                        llm_provider, llm_model, llm_base_url, llm_api_key, domain_material_paths
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         rec.id,
@@ -169,6 +232,11 @@ class AuthStore:
                         rec.token_version,
                         rec.materials_path,
                         1 if rec.materials_path_confirmed else 0,
+                        rec.llm_provider,
+                        rec.llm_model,
+                        rec.llm_base_url,
+                        rec.llm_api_key,
+                        json.dumps(rec.domain_material_paths, ensure_ascii=False),
                     ),
                 )
                 conn.commit()
@@ -256,6 +324,63 @@ class AuthStore:
                     (user_id,),
                 )
                 conn.commit()
+
+    def update_user_settings(
+        self,
+        user_id: str,
+        *,
+        llm_provider: str | None = None,
+        llm_model: str | None = None,
+        llm_base_url: str | None = None,
+        llm_api_key: str | None = None,
+        materials_path: str | None = None,
+        update_materials_path: bool = False,
+        domain_material_paths: dict[str, str] | None = None,
+    ) -> UserRecord:
+        with self._lock:
+            with self._connect() as conn:
+                row = conn.execute(
+                    "SELECT * FROM users WHERE id = ?",
+                    (user_id,),
+                ).fetchone()
+                rec = self._from_row(row)
+                if rec is None:
+                    raise ApiError(404, "USER_NOT_FOUND", "用户不存在")
+                next_provider = llm_provider if llm_provider is not None else rec.llm_provider
+                next_model = llm_model if llm_model is not None else rec.llm_model
+                next_base_url = llm_base_url if llm_base_url is not None else rec.llm_base_url
+                next_api_key = llm_api_key if llm_api_key is not None else rec.llm_api_key
+                next_materials_path = materials_path if update_materials_path else rec.materials_path
+                next_domain_paths = (
+                    domain_material_paths
+                    if domain_material_paths is not None
+                    else rec.domain_material_paths
+                )
+                conn.execute(
+                    """
+                    UPDATE users
+                    SET llm_provider = ?, llm_model = ?, llm_base_url = ?, llm_api_key = ?,
+                        materials_path = ?, domain_material_paths = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        next_provider,
+                        next_model,
+                        next_base_url,
+                        next_api_key,
+                        next_materials_path,
+                        json.dumps(next_domain_paths, ensure_ascii=False),
+                        user_id,
+                    ),
+                )
+                conn.commit()
+                updated = conn.execute(
+                    "SELECT * FROM users WHERE id = ?",
+                    (user_id,),
+                ).fetchone()
+            out = self._from_row(updated)
+            assert out is not None
+            return out
 
 
 def _password_hash(password: str, salt: str) -> str:
