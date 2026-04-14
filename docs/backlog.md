@@ -11,28 +11,30 @@
 
 ---
 
-## 正文 URL 抓取与 ingest 串联
+## 已完成任务记录（从 `function_plan.md` 迁入）
 
-- **需求**：用户消息中的 URL 由后端抓取、转 Markdown/文本、落盘到材料 Vault，再进入摄取管线（见 `api-outline` 3.1 说明）。
-- **依赖**：HTTP 客户端、速率限制、失败策略；与 Plan B 阶段 3「URL 抓取」一致。
+> 说明：当 `function_plan.md` 中议题状态变为“✅ 已完成”时，在此处追加留档，便于后续回溯与版本盘点。
 
-## 异步任务（Plan C）
+### F-1 用户管理与登录；未登录拦截；首登材料 Vault 路径配置向导
 
-- `**job_ids` 非空**：慢 ingest / 建图时返回任务 id，由前端轮询。
-- `**GET /api/v1/jobs/{job_id}`**：状态 `pending | running | success | failed` 与简要日志。
+- **状态**：✅ 已完成（2026-04-13）
+- **来源**：`docs/function_plan.md` §4.1
+- **落地摘要**：
+  - 登录/注册/会话能力已接入；
+  - 未登录访问受保护功能统一拦截；
+  - 首登材料路径确认向导已落地。
 
-## 会话与历史（可选）
+### F-2 领域动态增删（UI）；Vault 目录与默认路径策略
 
-- `POST/GET /api/v1/conversations`、`GET/POST .../messages`（见 `api-outline` 第 4 节）。
+- **状态**：✅ 已完成（2026-04-13）
+- **来源**：`docs/function_plan.md` §4.2
+- **落地摘要**：
+  - 动态领域管理（新增/编辑/归档）已落地；
+  - 领域与索引路径策略支持 fallback；
+  - 相关 API/UI/联调文档已同步。
 
-## 图谱 / Obsidian 入口
+---
 
-- `**GET /api/v1/graph/open?domain_id=...**`：返回自定义 URI 或 Obsidian 插件深链（见 `api-outline` 第 8 节）。
-
-## 模型侧能力深化
-
-- `**BaseAgent.ingest` 真实抽取**：当前多为占位空实体；接入 LLM/规则后写入 `graph_index` 才有业务价值。
-- **CLI `query` / `lint`**：`main.py` 仍为 TODO。
 
 ## 修订记录
 
@@ -41,5 +43,6 @@
 |------|------|
 | 2026-04-12 | 初稿：记录尚未实现能力，便于后续排期 |
 | 2026-04-12 | 明确：本文件为已计划实施项；与 `function_plan.md`（讨论稿、非实施依据）分工 |
+| 2026-04-13 | 新增“已完成任务记录”区，纳入 F-1/F-2 完成留档 |
 
 

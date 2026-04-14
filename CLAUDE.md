@@ -33,6 +33,12 @@ Python package with CLI, graph/vault/agent modules, and a **FastAPI** HTTP API. 
 
 When changing or implementing user-facing behavior, layouts, or copy: read and update `docs/ui_design.md` in the same change. Do not leave UI decisions only in issues or chat.
 
+## Planning and completion tracking
+
+- `docs/function_plan.md` remains discussion-only. Items there are not implementation commitments.
+- When an item is approved for implementation, move/record it in `docs/backlog.md`.
+- When an implemented item reaches completed status, **always** append a completion record in `docs/backlog.md` (status/date/source section), so backlog is the canonical history of completed planned work.
+
 ## Architecture
 
 The high-level architecture is documented in `docs/arch/punkrecords_arch.png` (and `docs/arch/PunkRecords_Arch.md`). Refer to these when understanding the intended system design.

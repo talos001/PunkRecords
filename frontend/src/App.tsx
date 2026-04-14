@@ -252,6 +252,8 @@ export function App() {
   const [editingDomainName, setEditingDomainName] = useState("");
   const [editingDomainDescription, setEditingDomainDescription] = useState("");
   const [editingDomainEmoji, setEditingDomainEmoji] = useState("📁");
+  const [modelProfile, setModelProfile] = useState("balanced");
+  const [reasoningLevel, setReasoningLevel] = useState("standard");
   const messagesRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -704,11 +706,18 @@ export function App() {
 
   const hasMessages = messages.length > 0;
   const timeGreeting = useMemo(() => getTimeGreeting(), []);
+  const isHomeView = navActive === "home";
+  const mainTopbarTitle =
+    navActive === "agent"
+      ? "模型配置"
+      : navActive === "settings"
+        ? "领域管理"
+        : "班克记录";
 
   return (
     <div className="app">
       <div
-        className={`layout${narrowScreen ? " layout--narrow" : ""}${narrowScreen && sidebarCollapsed ? " layout--narrow-rail" : ""}${hasMessages ? " layout--chat-active" : ""}`}
+        className={`layout${narrowScreen ? " layout--narrow" : ""}${narrowScreen && sidebarCollapsed ? " layout--narrow-rail" : ""}${isHomeView && hasMessages ? " layout--chat-active" : ""}`}
       >
         {narrowScreen && !sidebarCollapsed && (
           <button
@@ -740,6 +749,7 @@ export function App() {
                 title={item.label}
                 onClick={() => {
                   if (item.id === "settings" && !ensureReady("settings")) return;
+                  setUserMenuOpen(false);
                   setNavActive(item.id);
                 }}
               >
@@ -768,6 +778,37 @@ export function App() {
                   <button
                     type="button"
                     className="sidebar-user-menu-item"
+                    onClick={() => {
+                      setNavActive("home");
+                      setUserMenuOpen(false);
+                    }}
+                  >
+                    主页
+                  </button>
+                  <button
+                    type="button"
+                    className="sidebar-user-menu-item"
+                    onClick={() => {
+                      setNavActive("agent");
+                      setUserMenuOpen(false);
+                    }}
+                  >
+                    模型配置
+                  </button>
+                  <button
+                    type="button"
+                    className="sidebar-user-menu-item"
+                    onClick={() => {
+                      if (!ensureReady("settings")) return;
+                      setNavActive("settings");
+                      setUserMenuOpen(false);
+                    }}
+                  >
+                    领域管理
+                  </button>
+                  <button
+                    type="button"
+                    className="sidebar-user-menu-item sidebar-user-menu-item--danger"
                     onClick={() => void handleLogout()}
                   >
                     退出登录
@@ -794,44 +835,118 @@ export function App() {
                 <IconSidebarCollapseToggle />
               )}
             </button>
-            <span className="main-topbar-title">班克记录</span>
+            <span className="main-topbar-title">{mainTopbarTitle}</span>
           </header>
 
           <div
-            className={`main-inner${hasMessages ? " main-inner--active-chat" : " main-inner--empty"}`}
+            className={`main-inner${isHomeView ? (hasMessages ? " main-inner--active-chat" : " main-inner--empty") : " main-inner--panel"}`}
           >
-            <h2 className="hero-heading">
-              <span className="hero-greeting">{timeGreeting}</span>
-              ，今天想了解点什么？
-            </h2>
+            {isHomeView && (
+              <>
+                <h2 className="hero-heading">
+                  <span className="hero-greeting">{timeGreeting}</span>
+                  ，今天想了解点什么？
+                </h2>
 
-            <div
-              className="domain-pills"
-              role="radiogroup"
-              aria-label="选择知识区域"
-            >
-              {activeDomains.map((d) => (
-                <button
-                  key={d.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={d.id === domainId}
-                  className={`domain-pill${d.id === domainId ? " domain-pill--active" : ""}`}
-                  onClick={() => setDomainId(d.id)}
+                <div
+                  className="domain-pills"
+                  role="radiogroup"
+                  aria-label="选择知识区域"
                 >
-                  <span className="domain-pill-emoji" aria-hidden>
-                    {d.emoji}
-                  </span>
-                  <span className="domain-pill-name">{d.name}</span>
-                </button>
-              ))}
-            </div>
+                  {activeDomains.map((d) => (
+                    <button
+                      key={d.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={d.id === domainId}
+                      className={`domain-pill${d.id === domainId ? " domain-pill--active" : ""}`}
+                      onClick={() => setDomainId(d.id)}
+                    >
+                      <span className="domain-pill-emoji" aria-hidden>
+                        {d.emoji}
+                      </span>
+                      <span className="domain-pill-name">{d.name}</span>
+                    </button>
+                  ))}
+                </div>
 
-            <p className="context-hint">
-              当前区域：<strong>{safeCurrentDomain.name}</strong>
-              <span className="context-hint-dot">·</span>
-              {safeCurrentDomain.description}
-            </p>
+                <p className="context-hint">
+                  当前区域：<strong>{safeCurrentDomain.name}</strong>
+                  <span className="context-hint-dot">·</span>
+                  {safeCurrentDomain.description}
+                </p>
+              </>
+            )}
+
+            {navActive === "agent" && (
+              <section className="model-config" aria-label="模型配置">
+                <div className="domain-manager-header">
+                  <h3>模型配置</h3>
+                  <button
+                    type="button"
+                    className="domain-manager-back"
+                    onClick={() => setNavActive("home")}
+                  >
+                    返回主页
+                  </button>
+                </div>
+                <p className="domain-manager-hint">
+                  这里用于切换对话模型策略，后续可与后端配置联动。
+                </p>
+                <div className="model-config-group">
+                  <strong>模型档位</strong>
+                  <div className="model-config-options">
+                    <button
+                      type="button"
+                      className={`model-config-option${modelProfile === "fast" ? " model-config-option--active" : ""}`}
+                      onClick={() => setModelProfile("fast")}
+                    >
+                      快速
+                    </button>
+                    <button
+                      type="button"
+                      className={`model-config-option${modelProfile === "balanced" ? " model-config-option--active" : ""}`}
+                      onClick={() => setModelProfile("balanced")}
+                    >
+                      均衡
+                    </button>
+                    <button
+                      type="button"
+                      className={`model-config-option${modelProfile === "quality" ? " model-config-option--active" : ""}`}
+                      onClick={() => setModelProfile("quality")}
+                    >
+                      高质量
+                    </button>
+                  </div>
+                </div>
+                <div className="model-config-group">
+                  <strong>推理强度</strong>
+                  <div className="model-config-options">
+                    <button
+                      type="button"
+                      className={`model-config-option${reasoningLevel === "light" ? " model-config-option--active" : ""}`}
+                      onClick={() => setReasoningLevel("light")}
+                    >
+                      轻量
+                    </button>
+                    <button
+                      type="button"
+                      className={`model-config-option${reasoningLevel === "standard" ? " model-config-option--active" : ""}`}
+                      onClick={() => setReasoningLevel("standard")}
+                    >
+                      标准
+                    </button>
+                    <button
+                      type="button"
+                      className={`model-config-option${reasoningLevel === "deep" ? " model-config-option--active" : ""}`}
+                      onClick={() => setReasoningLevel("deep")}
+                    >
+                      深度
+                    </button>
+                  </div>
+                </div>
+              </section>
+            )}
 
             {navActive === "settings" && (
               <section className="domain-manager" aria-label="领域管理">
@@ -842,7 +957,7 @@ export function App() {
                     className="domain-manager-back"
                     onClick={() => setNavActive("home")}
                   >
-                    返回聊天
+                    返回主页
                   </button>
                 </div>
                 <p className="domain-manager-hint">
@@ -1077,90 +1192,94 @@ export function App() {
               </section>
             )}
 
-            <main className="chat">
-              <div className="messages" ref={messagesRef}>
-                {messages.length === 0 && (
-                  <div className="empty">
-                    <p>
-                      在下方输入框打字、粘贴链接，或将文件拖入输入区；也可点击回形针添加文件。
-                    </p>
+            {isHomeView && (
+              <>
+                <main className="chat">
+                  <div className="messages" ref={messagesRef}>
+                    {messages.length === 0 && (
+                      <div className="empty">
+                        <p>
+                          在下方输入框打字、粘贴链接，或将文件拖入输入区；也可点击回形针添加文件。
+                        </p>
+                      </div>
+                    )}
+                    {messages.map((msg) => (
+                      <article
+                        key={msg.id}
+                        className={`bubble bubble--${msg.role}`}
+                      >
+                        <div className="bubble-meta">
+                          {msg.role === "user" ? "你" : PYTHAGORAS_BUBBLE_LABEL}
+                        </div>
+                        <div className="bubble-body">
+                          {msg.content}
+                          {msg.role === "assistant" &&
+                            msg.streaming &&
+                            !msg.content && (
+                              <span className="bubble-wait" aria-live="polite">
+                                {PYTHAGORAS_THINKING}
+                              </span>
+                            )}
+                        </div>
+                      </article>
+                    ))}
                   </div>
-                )}
-                {messages.map((msg) => (
-                  <article
-                    key={msg.id}
-                    className={`bubble bubble--${msg.role}`}
-                  >
-                    <div className="bubble-meta">
-                      {msg.role === "user" ? "你" : PYTHAGORAS_BUBBLE_LABEL}
-                    </div>
-                    <div className="bubble-body">
-                      {msg.content}
-                      {msg.role === "assistant" &&
-                        msg.streaming &&
-                        !msg.content && (
-                          <span className="bubble-wait" aria-live="polite">
-                            {PYTHAGORAS_THINKING}
-                          </span>
-                        )}
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </main>
+                </main>
 
-            <footer
-              className="composer-wrap"
-              ref={composerRef}
-              onDragOver={onDragOver}
-              onDrop={onDrop}
-            >
-              {pendingFiles.length > 0 && (
-                <p className="composer-hint" aria-live="polite">
-                  将随下一条消息发送：{pendingFiles.map((f) => f.name).join("、")}
-                </p>
-              )}
-              <input
-                ref={fileInputRef}
-                type="file"
-                className="visually-hidden"
-                accept=".md,.markdown,.pdf,application/pdf,text/markdown"
-                multiple
-                onChange={(e) => {
-                  const fl = e.target.files;
-                  if (fl) addFiles(fl);
-                  e.target.value = "";
-                }}
-              />
-              <div className="composer-shell">
-                <button
-                  type="button"
-                  className="btn-attach"
-                  aria-label="添加文件"
-                  onClick={() => fileInputRef.current?.click()}
+                <footer
+                  className="composer-wrap"
+                  ref={composerRef}
+                  onDragOver={onDragOver}
+                  onDrop={onDrop}
                 >
-                  <IconPaperclip />
-                </button>
-                <textarea
-                  className="input-text"
-                  rows={1}
-                  placeholder="输入问题、粘贴链接或拖入文件…（Enter 发送，Shift+Enter 换行）"
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  onKeyDown={onKeyDown}
-                  onPaste={onPaste}
-                />
-                <button
-                  type="button"
-                  className="btn-send"
-                  aria-label="发送"
-                  disabled={sending}
-                  onClick={() => void send()}
-                >
-                  <IconSend />
-                </button>
-              </div>
-            </footer>
+                  {pendingFiles.length > 0 && (
+                    <p className="composer-hint" aria-live="polite">
+                      将随下一条消息发送：{pendingFiles.map((f) => f.name).join("、")}
+                    </p>
+                  )}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="visually-hidden"
+                    accept=".md,.markdown,.pdf,application/pdf,text/markdown"
+                    multiple
+                    onChange={(e) => {
+                      const fl = e.target.files;
+                      if (fl) addFiles(fl);
+                      e.target.value = "";
+                    }}
+                  />
+                  <div className="composer-shell">
+                    <button
+                      type="button"
+                      className="btn-attach"
+                      aria-label="添加文件"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <IconPaperclip />
+                    </button>
+                    <textarea
+                      className="input-text"
+                      rows={1}
+                      placeholder="输入问题、粘贴链接或拖入文件…（Enter 发送，Shift+Enter 换行）"
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value)}
+                      onKeyDown={onKeyDown}
+                      onPaste={onPaste}
+                    />
+                    <button
+                      type="button"
+                      className="btn-send"
+                      aria-label="发送"
+                      disabled={sending}
+                      onClick={() => void send()}
+                    >
+                      <IconSend />
+                    </button>
+                  </div>
+                </footer>
+              </>
+            )}
           </div>
         </section>
       </div>
